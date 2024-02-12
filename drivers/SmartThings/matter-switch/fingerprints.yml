@@ -1911,13 +1911,6 @@ matterManufacturer:
     productId: 0x228F
     deviceProfileName: light-color-level-2200K-6500K
 
-#THIRDREALITY
-  - id: "Thirdreality SmartColor NightLight"
-    deviceLabel: Matter Light and Sensor 
-    vendorId: 0x1407
-    productId: 0x1088
-    deviceProfileName: thirdreality-smartcolor-nightlight
-
 #Bridge devices need manufacturer specific fingerprints until
 #bridge support is released to all hubs. This is because of the way generic
 #fingerprints work for bridges joined prior to hubs being able to support them
