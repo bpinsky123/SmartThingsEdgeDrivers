@@ -1,5 +1,5 @@
 name: 'Matter Switch'
-packageKey: 'matter-switch'
+packageKey: 'matter-3rd-light'
 permissions:
   matter: {}
 description: "SmartThings driver for Matter switch devices"

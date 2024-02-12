@@ -421,6 +421,6 @@ function detect_matter_thing(device)
   return device:supports_capability(capabilities.refresh)
 end
 
-local matter_driver = MatterDriver("matter-switch", matter_driver_template)
+local matter_driver = MatterDriver("matter-3rd-light", matter_driver_template)
 log.info_with({hub_logs=true}, string.format("Starting %s driver, with dispatcher: %s", matter_driver.NAME, matter_driver.matter_dispatcher))
 matter_driver:run()
