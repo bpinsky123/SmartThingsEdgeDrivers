@@ -1,0 +1,7 @@
+matterManufacturer:
+#THIRDREALITY
+  - id: "Thirdreality SmartColor NightLight"
+    deviceLabel: Matter Light and Sensor 
+    vendorId: 0x1407
+    productId: 0x1088
+    deviceProfileName: thirdreality-smartcolor-nightlight

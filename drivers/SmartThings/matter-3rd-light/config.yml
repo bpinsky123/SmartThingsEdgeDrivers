@@ -1,0 +1,6 @@
+name: 'Matter THIRDREALITY Smart Color'
+packageKey: 'matter-3rd-light'
+permissions:
+  matter: {}
+description: "SmartThings driver for THIRDREALITY Matter Smart Color Night Light"
+vendorSupportInformation: "https://support.smartthings.com"
