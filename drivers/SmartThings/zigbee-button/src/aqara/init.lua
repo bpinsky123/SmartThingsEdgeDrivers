@@ -21,14 +21,16 @@ local capabilities = require "st.capabilities"
 
 local PowerConfiguration = clusters.PowerConfiguration
 local PRIVATE_CLUSTER_ID = 0xFCC0
-local PRIVATE_ATTRIBUTE_ID = 0x0009
+local PRIVATE_ATTRIBUTE_ID_T1 = 0x0009
+local PRIVATE_ATTRIBUTE_ID_E1 = 0x0125
 local MFG_CODE = 0x115F
 
 local MULTISTATE_INPUT_CLUSTER_ID = 0x0012
 local PRESENT_ATTRIBUTE_ID = 0x0055
 
 local FINGERPRINTS = {
-  { mfr = "LUMI", model = "lumi.remote.b1acn02" }
+  { mfr = "LUMI", model = "lumi.remote.b1acn02" },
+  { mfr = "LUMI", model = "lumi.remote.acn003" }
 }
 
 local configuration = {
@@ -79,20 +81,35 @@ local function device_init(driver, device)
     end
 end
 
-  local function added_handler(self, device)
-    device:send(cluster_base.write_manufacturer_specific_attribute(device,
-                PRIVATE_CLUSTER_ID, PRIVATE_ATTRIBUTE_ID, MFG_CODE, data_types.Uint8, 1))
+local function added_handler(self, device)
     device:emit_event(capabilities.button.supportedButtonValues({"pushed","held","double"}, {visibility = { displayed = false }}))
     device:emit_event(capabilities.button.numberOfButtons({value = 1}))
     device:emit_event(capabilities.button.button.pushed({state_change = false}))
     device:emit_event(capabilities.battery.battery(100))
 end
 
+local function do_configure(driver, device)
+  device:configure()
+  if device:get_model() == "lumi.remote.b1acn02" then
+    device:send(cluster_base.write_manufacturer_specific_attribute(device,
+    PRIVATE_CLUSTER_ID, PRIVATE_ATTRIBUTE_ID_T1, MFG_CODE, data_types.Uint8, 1))
+  elseif device:get_model() == "lumi.remote.acn003" then
+    device:send(cluster_base.write_manufacturer_specific_attribute(device,
+    PRIVATE_CLUSTER_ID, PRIVATE_ATTRIBUTE_ID_E1, MFG_CODE, data_types.Uint8, 2))
+  end
+  -- when the wireless switch T1 accesses the network, the gateway sends
+  -- private attribute 0009 to make the device no longer distinguish
+  -- between the standard gateway and the aqara gateway.
+  -- When wireless switch E1 is connected to the network, the gateway sends
+  -- private attribute 0125 to enable the device to send double-click and long-press packets.
+end
+
 local aqara_wireless_switch_handler = {
     NAME = "Aqara Wireless Switch Handler",
     lifecycle_handlers = {
       init = device_init,
-      added = added_handler
+      added = added_handler,
+      doConfigure = do_configure
     },
     zigbee_handlers = {
       attr = {
@@ -105,4 +122,3 @@ local aqara_wireless_switch_handler = {
 }
 
 return aqara_wireless_switch_handler
-
