@@ -28,11 +28,16 @@ local FINGERPRINTS = {
   { mfr = "LUMI", model = "lumi.plug.maeu01" },
   { mfr = "LUMI", model = "lumi.plug.macn01" },
   { mfr = "LUMI", model = "lumi.switch.n0agl1" },
+  { mfr = "LUMI", model = "lumi.switch.l0agl1" },
   { mfr = "LUMI", model = "lumi.switch.n0acn2" },
   { mfr = "LUMI", model = "lumi.switch.n1acn1" },
   { mfr = "LUMI", model = "lumi.switch.n2acn1" },
   { mfr = "LUMI", model = "lumi.switch.n3acn1" },
-  { mfr = "LUMI", model = "lumi.switch.b2laus01" }
+  { mfr = "LUMI", model = "lumi.switch.b2laus01" },
+  { mfr = "LUMI", model = "lumi.switch.n1aeu1" },
+  { mfr = "LUMI", model = "lumi.switch.n2aeu1" },
+  { mfr = "LUMI", model = "lumi.switch.l1aeu1" },
+  { mfr = "LUMI", model = "lumi.switch.l2aeu1" }
 }
 
 local preference_map = {
@@ -193,8 +198,10 @@ end
 
 local function do_refresh(self, device)
   device:send(OnOff.attributes.OnOff:read(device))
-  device:send(ElectricalMeasurement.attributes.ActivePower:read(device))
-  device:send(SimpleMetering.attributes.CurrentSummationDelivered:read(device))
+  if (device:supports_capability_by_id(capabilities.powerMeter.ID)) then
+    device:send(ElectricalMeasurement.attributes.ActivePower:read(device))
+    device:send(SimpleMetering.attributes.CurrentSummationDelivered:read(device))
+  end
 end
 
 local function device_info_changed(driver, device, event, args)
@@ -224,9 +231,10 @@ local function do_configure(self, device)
 end
 
 local function device_added(driver, device)
-  device:emit_event(capabilities.powerMeter.power({ value = 0.0, unit = "W" }))
-  device:emit_event(capabilities.energyMeter.energy({ value = 0.0, unit = "Wh" }))
-
+  if (device:supports_capability_by_id(capabilities.powerMeter.ID)) then
+    device:emit_event(capabilities.powerMeter.power({ value = 0.0, unit = "W" }))
+    device:emit_event(capabilities.energyMeter.energy({ value = 0.0, unit = "Wh" }))
+  end
 end
 
 local aqara_switch_handler = {
