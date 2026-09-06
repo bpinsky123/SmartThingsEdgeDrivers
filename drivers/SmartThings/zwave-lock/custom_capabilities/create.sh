@@ -18,14 +18,11 @@ schlageInteriorButton
 
 for name in $capabilities; do
   id="$namespace.$name"
-  if smartthings capabilities "$id" --capability-version 1 --json >/dev/null 2>&1; then
-    smartthings capabilities:update "$id" --capability-version 1 -i "$root/$id.capability.json"
-  else
+  if ! smartthings capabilities:update "$id" --capability-version 1 -i "$root/$id.capability.json"; then
     smartthings capabilities:create --namespace "$namespace" --organization "$organization" -i "$root/$id.capability.json"
   fi
-  if smartthings capabilities:presentation "$id" --capability-version 1 --json >/dev/null 2>&1; then
-    smartthings capabilities:presentation:update "$id" --capability-version 1 --organization "$organization" -i "$root/$id.presentation.json"
-  else
+
+  if ! smartthings capabilities:presentation:update "$id" --capability-version 1 --organization "$organization" -i "$root/$id.presentation.json"; then
     smartthings capabilities:presentation:create "$id" --organization "$organization" --capability-version 1 -i "$root/$id.presentation.json"
   fi
 done
