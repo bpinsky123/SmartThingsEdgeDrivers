@@ -24,7 +24,7 @@ components:
     version: 1
   - id: heartsample19211.autoLock
     version: 1
-  - id: 
+  - id: heartsample19211.interiorSchlageButton 
     version: 1
   - id: heartsample19211.keypadBeep
     version: 1
