@@ -17,6 +17,6 @@ schlageInteriorButton
 
 for name in $capabilities; do
   id="${namespace}.${name}"
-  smartthings capabilities:create -i "${root}/${id}.capability.json"
-  smartthings capabilities:presentation:create "$id" 1 -i "${root}/${id}.presentation.json"
+  smartthings capabilities:create --namespace "$namespace" -i "${root}/${id}.capability.json"
+  smartthings capabilities:presentation:create "$id" --capability-version 1 -i "${root}/${id}.presentation.json"
 done
