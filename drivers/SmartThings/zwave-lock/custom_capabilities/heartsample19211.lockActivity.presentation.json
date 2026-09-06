@@ -1,0 +1,18 @@
+{
+  "dashboard": {"states": [{"label": "{{message.value}}"}], "actions": [], "panelItems": []},
+  "detailView": [{"label": "Last Activity", "displayType": "state", "state": {"label": "{{message.value}}"}}],
+  "automation": {
+    "conditions": [
+      {"label": "Lock activity", "displayType": "list", "list": {"value": "activity.value", "valueType": "string", "multiSelectable": false, "alternatives": [
+        {"key": "keypadLocked", "value": "Locked with keypad"}, {"key": "keypadUnlocked", "value": "Unlocked with keypad"},
+        {"key": "manualLocked", "value": "Locked manually"}, {"key": "manualUnlocked", "value": "Unlocked manually"},
+        {"key": "remoteLocked", "value": "Locked remotely"}, {"key": "remoteUnlocked", "value": "Unlocked remotely"},
+        {"key": "autoLocked", "value": "Auto-locked"}, {"key": "lockJammed", "value": "Lock jammed"}, {"key": "unknown", "value": "Unknown lock activity"}
+      ]}},
+      {"label": "Lock user name", "displayType": "textField", "textField": {"value": "userName.value", "valueType": "string"}}
+    ],
+    "actions": []
+  },
+  "id": "heartsample19211.lockActivity",
+  "version": 1
+}

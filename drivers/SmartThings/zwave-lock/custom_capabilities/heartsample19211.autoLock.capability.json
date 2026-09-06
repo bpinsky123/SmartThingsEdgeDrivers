@@ -1,0 +1,10 @@
+# Schlage custom capabilities
+
+These JSON files define the custom capabilities used by the Schlage profiles.
+They must be created in the `heartsample19211` SmartThings namespace before
+packaging this driver, followed by their matching presentations.
+
+The `lockActivity` capability replaces the Community driver's `unlockCodeName`.
+It provides a display-only last-activity message and automation conditions for
+the activity type and the manually entered user name.
+{"dashboard":{"states":[{"label":"{{autoLock.value}}"}],"actions":[],"panelItems":[]},"detailView":[{"label":"Auto lock","displayType":"switch","switch":{"command":{"on":"autolock","off":"off"},"state":{"value":"autoLock.value","valueType":"string","on":"autolock","off":"off"}}}],"automation":{"conditions":[{"label":"Auto lock","displayType":"list","list":{"value":"autoLock.value","valueType":"string","multiSelectable":false,"alternatives":[{"key":"off","value":"Off"},{"key":"autolock","value":"Auto lock"}]}}],"actions":[{"label":"Auto lock","displayType":"list","list":{"command":"autolock","alternatives":[{"key":"off","value":"Off"},{"key":"autolock","value":"Auto lock"}]}}]},"id":"heartsample19211.autoLock","version":1}

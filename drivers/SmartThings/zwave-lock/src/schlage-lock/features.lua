@@ -1,0 +1,1 @@
+/bpinsky123/SmartThingsEdgeDrivers/drivers/SmartThings/zwave-lock/src/schlage-lock/profiles.lua
