@@ -59,16 +59,20 @@ end
 
 local command_params = {
   ["heartsample19211.schlageLockAlarm"] = {
+    off = { parameter = 7, value = 0 },
+    activity = { parameter = 7, value = 1 },
+    tamper = { parameter = 7, value = 2 },
+    forcedentry = { parameter = 7, value = 3 },
     setAlarmMode = { parameter = 7, argument = "mode", values = {off = 0, activity = 1, tamper = 2, forcedentry = 3} },
     setActivitySensitivity = { parameter = 8, argument = "sensitivity" },
     setTamperSensitivity = { parameter = 9, argument = "sensitivity" },
     setForcedSensitivity = { parameter = 10, argument = "sensitivity" },
   },
-  ["heartsample19211.autoLock"] = { setAutoLock = { parameter = 15, argument = "mode", values = {autolock = -1, off = 0} } },
-  ["heartsample19211.lockAndLeave"] = { setLockAndLeave = { parameter = 5, argument = "mode", values = {lockandleave = -1, off = 0} } },
-  ["heartsample19211.vacationMode"] = { setVacationMode = { parameter = 4, argument = "mode", values = {vacation = -1, off = 0} } },
-  ["heartsample19211.keypadBeep"] = { setKeypadBeep = { parameter = 3, argument = "mode", values = {beep = -1, off = 0} } },
-  ["heartsample19211.schlageInteriorButton"] = { setInteriorButton = { parameter = 11, argument = "mode", values = {enable = -1, disable = 0} } },
+  ["heartsample19211.autoLock"] = { autolock = { parameter = 15, value = -1 }, off = { parameter = 15, value = 0 }, setAutoLock = { parameter = 15, argument = "mode", values = {autolock = -1, off = 0} } },
+  ["heartsample19211.lockAndLeave"] = { lockandleave = { parameter = 5, value = -1 }, off = { parameter = 5, value = 0 }, setLockAndLeave = { parameter = 5, argument = "mode", values = {lockandleave = -1, off = 0} } },
+  ["heartsample19211.vacationMode"] = { vacation = { parameter = 4, value = -1 }, off = { parameter = 4, value = 0 }, setVacationMode = { parameter = 4, argument = "mode", values = {vacation = -1, off = 0} } },
+  ["heartsample19211.keypadBeep"] = { beep = { parameter = 3, value = -1 }, off = { parameter = 3, value = 0 }, setKeypadBeep = { parameter = 3, argument = "mode", values = {beep = -1, off = 0} } },
+  ["heartsample19211.schlageInteriorButton"] = { enable = { parameter = 11, value = -1 }, disable = { parameter = 11, value = 0 }, setInteriorButton = { parameter = 11, argument = "mode", values = {enable = -1, disable = 0} } },
 }
 
 function M.setting_command(_, device, cmd)
