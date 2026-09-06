@@ -1,1 +1,1 @@
-{"name":"Auto Lock","attributes":{"autoLock":{"schema":{"type":"object","properties":{"value":{"type":"string","enum":["autolock","off"]}},"additionalProperties":false,"required":["value"]},"enumCommands":[{"command":"autolock","value":"autolock"},{"command":"off","value":"off"}]}},"commands":{"autolock":{"name":"autolock","arguments":[],"sensitive":false},"off":{"name":"off","arguments":[],"sensitive":false}}}
+    ["heartsample19211.vacationMode"] = { setVacationMode = { parameter = 4, argument = "mode", values = {vacation = -1, off = 0} } },

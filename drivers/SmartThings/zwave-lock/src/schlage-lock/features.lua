@@ -64,9 +64,9 @@ local command_params = {
     setTamperSensitivity = { parameter = 9, argument = "sensitivity" },
     setForcedSensitivity = { parameter = 10, argument = "sensitivity" },
   },
-  ["heartsample19211.autoLock"] = { autolock = { parameter = 15, value = -1 }, off = { parameter = 15, value = 0 } },
+  ["heartsample19211.autoLock"] = { setAutoLock = { parameter = 15, argument = "mode", values = {autolock = -1, off = 0} } },
   ["heartsample19211.lockAndLeave"] = { lockandleave = { parameter = 5, value = -1 }, off = { parameter = 5, value = 0 } },
-  ["heartsample19211.vacationMode"] = { vacation = { parameter = 4, value = -1 }, off = { parameter = 4, value = 0 } },
+  ["heartsample19211.vacationMode"] = { setVacationMode = { parameter = 4, argument = "mode", values = {vacation = -1, off = 0} } },
   ["heartsample19211.keypadBeep"] = { beep = { parameter = 3, value = -1 }, off = { parameter = 3, value = 0 } },
   ["heartsample19211.schlageInteriorButton"] = { enable = { parameter = 11, value = -1 }, disable = { parameter = 11, value = 0 } },
 }

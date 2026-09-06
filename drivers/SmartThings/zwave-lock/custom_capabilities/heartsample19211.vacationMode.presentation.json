@@ -1,1 +1,31 @@
-{"dashboard":{"states":[{"label":"{{vacationMode.value}}"}],"actions":[],"panelItems":[]},"detailView":[{"label":"Vacation mode","displayType":"switch","switch":{"command":{"on":"vacation","off":"off"},"state":{"value":"vacationMode.value","valueType":"string","on":"vacation","off":"off"}}}],"automation":{"conditions":[{"label":"Vacation mode","displayType":"list","list":{"value":"vacationMode.value","valueType":"string","multiSelectable":false,"alternatives":[{"key":"off","value":"Off"},{"key":"vacation","value":"Vacation"}]}}],"actions":[{"label":"Vacation mode","displayType":"list","list":{"command":"vacation","alternatives":[{"key":"off","value":"Off"},{"key":"vacation","value":"Vacation"}]}}]},"id":"heartsample19211.vacationMode","version":1}
+#!/bin/sh
+set -eu
+
+root="$(cd "$(dirname "$0")" && pwd)"
+namespace="heartsample19211"
+
+capabilities="
+lockActivity
+deviceNetworkId
+schlageLockAlarm
+autoLock
+lockAndLeave
+vacationMode
+keypadBeep
+schlageInteriorButton
+"
+
+for name in $capabilities; do
+  id="$namespace.$name"
+  if smartthings capabilities "$id" --capability-version 1 --json >/dev/null 2>&1; then
+    smartthings capabilities:update "$id" 1 -i "$root/$id.capability.json"
+  else
+    smartthings capabilities:create --namespace "$namespace" -i "$root/$id.capability.json"
+  fi
+
+  if smartthings capabilities:presentation "$id" --capability-version 1 --json >/dev/null 2>&1; then
+    smartthings capabilities:presentation:update "$id" 1 -i "$root/$id.presentation.json"
+  else
+    smartthings capabilities:presentation:create "$id" --capability-version 1 -i "$root/$id.presentation.json"
+  fi
+done
