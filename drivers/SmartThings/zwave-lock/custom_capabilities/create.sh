@@ -24,7 +24,7 @@ for name in $capabilities; do
     smartthings capabilities:create --namespace "$namespace" --organization "$organization" -i "$root/$id.capability.json"
   fi
   if smartthings capabilities:presentation "$id" --capability-version 1 --json >/dev/null 2>&1; then
-    smartthings capabilities:presentation:update "$id" 1 --organization "$organization" -i "$root/$id.presentation.json"
+    smartthings capabilities:presentation:update "$id" --capability-version 1 --organization "$organization" -i "$root/$id.presentation.json"
   else
     smartthings capabilities:presentation:create "$id" --organization "$organization" --capability-version 1 -i "$root/$id.presentation.json"
   fi
