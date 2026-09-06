@@ -65,10 +65,10 @@ local command_params = {
     setForcedSensitivity = { parameter = 10, argument = "sensitivity" },
   },
   ["heartsample19211.autoLock"] = { setAutoLock = { parameter = 15, argument = "mode", values = {autolock = -1, off = 0} } },
-  ["heartsample19211.lockAndLeave"] = { lockandleave = { parameter = 5, value = -1 }, off = { parameter = 5, value = 0 } },
+  ["heartsample19211.lockAndLeave"] = { setLockAndLeave = { parameter = 5, argument = "mode", values = {lockandleave = -1, off = 0} } },
   ["heartsample19211.vacationMode"] = { setVacationMode = { parameter = 4, argument = "mode", values = {vacation = -1, off = 0} } },
-  ["heartsample19211.keypadBeep"] = { beep = { parameter = 3, value = -1 }, off = { parameter = 3, value = 0 } },
-  ["heartsample19211.schlageInteriorButton"] = { enable = { parameter = 11, value = -1 }, disable = { parameter = 11, value = 0 } },
+  ["heartsample19211.keypadBeep"] = { setKeypadBeep = { parameter = 3, argument = "mode", values = {beep = -1, off = 0} } },
+  ["heartsample19211.schlageInteriorButton"] = { setInteriorButton = { parameter = 11, argument = "mode", values = {enable = -1, disable = 0} } },
 }
 
 function M.setting_command(_, device, cmd)
