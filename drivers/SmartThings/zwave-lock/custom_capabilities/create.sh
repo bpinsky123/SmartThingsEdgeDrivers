@@ -13,7 +13,11 @@ autoLock
 lockAndLeave
 vacationMode
 keypadBeep
-schlageInteriorControl
+"
+
+presentations="
+$capabilities
+interiorSchlageButton
 "
 
 for name in $capabilities; do
@@ -21,7 +25,10 @@ for name in $capabilities; do
   if ! smartthings capabilities:update "$id" --capability-version 1 -i "$root/$id.capability.json"; then
     smartthings capabilities:create --namespace "$namespace" --organization "$organization" -i "$root/$id.capability.json"
   fi
+done
 
+for name in $presentations; do
+  id="$namespace.$name"
   if ! smartthings capabilities:presentation:update "$id" --capability-version 1 --organization "$organization" -i "$root/$id.presentation.json"; then
     smartthings capabilities:presentation:create "$id" --organization "$organization" --capability-version 1 -i "$root/$id.presentation.json"
   fi
