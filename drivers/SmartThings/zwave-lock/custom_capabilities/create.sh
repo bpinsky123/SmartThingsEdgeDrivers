@@ -13,7 +13,7 @@ autoLock
 lockAndLeave
 vacationMode
 keypadBeep
-schlageInteriorButton
+schlageInteriorControl
 "
 
 for name in $capabilities; do

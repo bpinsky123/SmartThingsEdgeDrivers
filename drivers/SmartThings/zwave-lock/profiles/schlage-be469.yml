@@ -1,13 +1,11 @@
-name: schlage-be469-migrated
+name: schlage-be469-legacy
 components:
 - id: main
   label: Main
   capabilities:
   - id: lock
     version: 1
-  - id: lockCredentials
-    version: 1
-  - id: lockUsers
+  - id: lockCodes
     version: 1
   - id: heartsample19211.lockActivity
     version: 1
@@ -39,6 +37,13 @@ components:
   - id: refresh
     version: 1
 preferences:
+- title: "Query lock codes on refresh"
+  name: refreshCodes
+  description: "For legacy lock-code devices, retrieve all lock codes when refreshed."
+  required: true
+  preferenceType: boolean
+  definition:
+    default: true
 - title: "Length of user code"
   name: codeLength
   description: "User codes may be between 4 and 8 digits. Changing this setting erases all existing codes."

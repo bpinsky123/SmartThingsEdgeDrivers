@@ -10,7 +10,7 @@ M.capabilities = {
   lock_and_leave = capabilities["heartsample19211.lockAndLeave"],
   vacation_mode = capabilities["heartsample19211.vacationMode"],
   keypad_beep = capabilities["heartsample19211.keypadBeep"],
-  interior_button = capabilities["heartsample19211.schlageInteriorButton"],
+  interior_button = capabilities["heartsample19211.schlageInteriorControl"],
   activity = capabilities["heartsample19211.lockActivity"],
   device_network_id = capabilities["heartsample19211.deviceNetworkId"],
 }
@@ -72,7 +72,7 @@ local command_params = {
   ["heartsample19211.lockAndLeave"] = { lockandleave = { parameter = 5, value = -1 }, off = { parameter = 5, value = 0 }, setLockAndLeave = { parameter = 5, argument = "mode", values = {lockandleave = -1, off = 0} } },
   ["heartsample19211.vacationMode"] = { vacation = { parameter = 4, value = -1 }, off = { parameter = 4, value = 0 }, setVacationMode = { parameter = 4, argument = "mode", values = {vacation = -1, off = 0} } },
   ["heartsample19211.keypadBeep"] = { beep = { parameter = 3, value = -1 }, off = { parameter = 3, value = 0 }, setKeypadBeep = { parameter = 3, argument = "mode", values = {beep = -1, off = 0} } },
-  ["heartsample19211.schlageInteriorButton"] = { enable = { parameter = 11, value = -1 }, disable = { parameter = 11, value = 0 }, setInteriorButton = { parameter = 11, argument = "mode", values = {enable = -1, disable = 0} } },
+  ["heartsample19211.schlageInteriorControl"] = { enable = { parameter = 11, value = -1 }, disable = { parameter = 11, value = 0 }, setInteriorButton = { parameter = 11, argument = "mode", values = {enable = -1, disable = 0} } },
 }
 
 function M.setting_command(_, device, cmd)
