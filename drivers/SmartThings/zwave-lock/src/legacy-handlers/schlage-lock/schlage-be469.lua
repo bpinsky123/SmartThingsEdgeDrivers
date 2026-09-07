@@ -10,9 +10,7 @@ local fingerprints = {
 }
 
 local function can_handle(_, _, device)
-  for _, fingerprint in ipairs(fingerprints) do
-    if device:id_match(fingerprint.mfr, fingerprint.prod, fingerprint.model) then return true end
-  end
+  -- BE468/BE469 locks are claimed exclusively by schlage-lock-bp.
   return false
 end
 
