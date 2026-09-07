@@ -83,8 +83,12 @@ M.command_params = command_params
 
 function M.setting_command(_, device, cmd)
   local spec = command_params[cmd.capability] and command_params[cmd.capability][cmd.command]
-  if not spec then return end
+  if not spec then
+    log.warn(string.format("No Schlage setting mapping for %s.%s", cmd.capability, cmd.command))
+    return
+  end
   local value = spec.value or (spec.values and spec.values[cmd.args[spec.argument]]) or cmd.args[spec.argument]
+  log.info(string.format("Setting Schlage configuration parameter %d to %s", spec.parameter, tostring(value)))
   device:send(Configuration:Set({ parameter_number = spec.parameter, configuration_value = value, size = 1 }))
 end
 
