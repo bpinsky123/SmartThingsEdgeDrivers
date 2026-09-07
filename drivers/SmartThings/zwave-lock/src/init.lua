@@ -128,15 +128,21 @@ local driver_template = {
   shared_device_thread_enabled = true,
 }
 
-defaults.register_for_default_handlers(driver_template, driver_template.supported_capabilities)
-
--- Register after the default handler map is built; the defaults call replaces it.
-driver_template.capability_handlers[capabilities.refresh.ID][capabilities.refresh.commands.refresh.NAME] = refresh_handler
-for capability_id, commands in pairs(schlage_features.command_params) do
-  driver_template.capability_handlers[capability_id] = {}
-  for command_name, _ in pairs(commands) do
-    driver_template.capability_handlers[capability_id][command_name] = schlage_features.setting_command
+local function register_schlage_capability_handlers(template)
+  template.capability_handlers[capabilities.refresh.ID] = template.capability_handlers[capabilities.refresh.ID] or {}
+  template.capability_handlers[capabilities.refresh.ID][capabilities.refresh.commands.refresh.NAME] = refresh_handler
+  for capability_id, commands in pairs(schlage_features.command_params) do
+    template.capability_handlers[capability_id] = {}
+    for command_name, _ in pairs(commands) do
+      template.capability_handlers[capability_id][command_name] = schlage_features.setting_command
+    end
   end
 end
+
+-- The default registration can replace the handler map, depending on SDK version.
+register_schlage_capability_handlers(driver_template)
+defaults.register_for_default_handlers(driver_template, driver_template.supported_capabilities)
+register_schlage_capability_handlers(driver_template)
+log.info("Registered Schlage custom capability handlers")
 local lock = ZwaveDriver("zwave_lock", driver_template)
 lock:run()
