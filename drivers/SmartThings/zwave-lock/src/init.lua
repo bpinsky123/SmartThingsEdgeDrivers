@@ -18,45 +18,34 @@ local consts              = require "lock_utils.constants"
 local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
-local schlage_features   = require "schlage-lock.features"
-
 
 local LockLifecycle = {}
 
 local function refresh_handler(driver, device, cmd)
   capability_handlers.refresh(driver, device, cmd)
-  schlage_features.emit_device_network_id(device)
-  schlage_features.refresh_settings(device)
 end
 
 function LockLifecycle.device_added(driver, device)
   if device:supports_capability(capabilities.tamperAlert) then
     device:emit_event(capabilities.tamperAlert.tamper.clear())
   end
-  -- set initial state
   driver:inject_capability_command(device, {
     capability = capabilities.refresh.ID,
     command = capabilities.refresh.commands.refresh.NAME,
     args = {}
   })
-  schlage_features.emit_device_network_id(device)
-  schlage_features.refresh_settings(device)
 end
 
 function LockLifecycle.init(driver, device)
-  -- Restore users/credentials capability state from the persistent store in case
-  -- the capability state cache was wiped since the last driver run.
   table_utils.restore_from_persistent_store(device)
 
   local lock_pins_supported_by_profile = device:supports_capability(capabilities.lockCodes)
   if lock_pins_supported_by_profile and device:get_field(consts.DRIVER_STATE.SLGA_MIGRATED) == true then
-    -- ensure lockCodes capability state is reflected correctly for already migrated devices
     device:emit_event(capabilities.lockCodes.migrated(true, { visibility = { displayed = false } }))
     device:emit_event(capabilities.lockCredentials.supportedCredentials({ consts.CRED_TYPE_PIN }, { visibility = { displayed = false } }))
   end
 
   if device:supports_capability(capabilities.tamperAlert) then
-    -- ensure our user/credential state is accurate to the current device state
     device:emit_event(capabilities.tamperAlert.tamper.clear())
   end
 end
@@ -76,7 +65,7 @@ local driver_template = {
   },
   zwave_handlers = {
     [cc.TIME] = {
-      [0x01] = zwave_handlers.time_get_handler, -- used by DanaLock
+      [0x01] = zwave_handlers.time_get_handler,
       [0x03] = zwave_handlers.date_get_handler
     },
     [cc.NOTIFICATION] = {
@@ -115,34 +104,11 @@ local driver_template = {
     capabilities.lockCredentials,
     capabilities.battery,
     capabilities.tamperAlert,
-    schlage_features.capabilities.alarm,
-    schlage_features.capabilities.auto_lock,
-    schlage_features.capabilities.lock_and_leave,
-    schlage_features.capabilities.vacation_mode,
-    schlage_features.capabilities.keypad_beep,
-    schlage_features.capabilities.interior_button,
-    schlage_features.capabilities.activity,
-    schlage_features.capabilities.device_network_id,
   },
   sub_drivers = require("sub_drivers"),
   shared_device_thread_enabled = true,
 }
 
-local function register_schlage_capability_handlers(template)
-  template.capability_handlers[capabilities.refresh.ID] = template.capability_handlers[capabilities.refresh.ID] or {}
-  template.capability_handlers[capabilities.refresh.ID][capabilities.refresh.commands.refresh.NAME] = refresh_handler
-  for capability_id, commands in pairs(schlage_features.command_params) do
-    template.capability_handlers[capability_id] = {}
-    for command_name, _ in pairs(commands) do
-      template.capability_handlers[capability_id][command_name] = schlage_features.setting_command
-    end
-  end
-end
-
--- The default registration can replace the handler map, depending on SDK version.
-register_schlage_capability_handlers(driver_template)
 defaults.register_for_default_handlers(driver_template, driver_template.supported_capabilities)
-register_schlage_capability_handlers(driver_template)
-log.info("Registered Schlage custom capability handlers")
 local lock = ZwaveDriver("zwave_lock", driver_template)
 lock:run()

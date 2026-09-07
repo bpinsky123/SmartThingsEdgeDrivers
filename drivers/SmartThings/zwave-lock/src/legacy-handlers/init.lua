@@ -7,7 +7,6 @@ local Notification = (require "st.zwave.CommandClass.Notification")({version=3})
 local UserCode = (require "st.zwave.CommandClass.UserCode")({version=1})
 local LockDefaults = require "st.zwave.defaults.lock"
 local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
-local schlage_features = require "schlage-lock.features"
 
 local init_handler = function(driver, device, event)
   local constants = require "st.zwave.constants"
@@ -111,8 +110,6 @@ local legacy_capabilities = {
       [capabilities.lockCodes.commands.updateCodes.NAME] = update_codes,
       [capabilities.lockCodes.commands.migrate.NAME] = migrate
     },
-    [schlage_features.capabilities.alarm.ID] = { off = schlage_features.setting_command, activity = schlage_features.setting_command, tamper = schlage_features.setting_command, forcedentry = schlage_features.setting_command, setAlarmMode = schlage_features.setting_command, setActivitySensitivity = schlage_features.setting_command, setTamperSensitivity = schlage_features.setting_command, setForcedSensitivity = schlage_features.setting_command },
-    [schlage_features.capabilities.auto_lock.ID] = { autolock = schlage_features.setting_command, off = schlage_features.setting_command, setAutoLock = schlage_features.setting_command },
   },
   zwave_handlers = {
     [cc.NOTIFICATION] = {

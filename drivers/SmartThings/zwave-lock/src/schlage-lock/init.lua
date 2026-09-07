@@ -14,15 +14,12 @@ local Association = (require "st.zwave.CommandClass.Association")({version=1})
 local tables          = require "lock_utils.tables"
 local zwave_handlers  = require "lock_handlers.zwave_responses"
 local cap_handlers    = require "lock_handlers.capabilities"
-local schlage_features = require "schlage-lock.features"
 
 local SCHLAGE_LOCK_CODE_LENGTH_PARAM = {number = 16, size = 1}
 
 local function do_configure(self, device)
   device:send(Configuration:Get({parameter_number = SCHLAGE_LOCK_CODE_LENGTH_PARAM.number}))
   device:send(Association:Set({grouping_identifier = 2, node_ids = {self.environment_info.hub_zwave_id}}))
-  schlage_features.emit_device_network_id(device)
-  schlage_features.refresh_settings(device)
 end
 
 local function basic_set_handler(self, device, cmd)
@@ -45,17 +42,12 @@ local function configuration_report(self, device, cmd)
   end
 end
 
-local function schlage_configuration_report(self, device, cmd)
-  configuration_report(self, device, cmd)
-  schlage_features.configuration_report(device, cmd)
-end
-
 local function is_user_code_report_mfr_specific(device, cmd)
   local reported_user_id_status = cmd.args.user_id_status
   local user_code = cmd.args.user_code
   local code_id = cmd.args.user_identifier
 
-  if reported_user_id_status == user_id_status.ENABLED_GRANT_ACCESS or -- OCCUPIED in UserCodeV1
+  if reported_user_id_status == user_id_status.ENABLED_GRANT_ACCESS or
       (reported_user_id_status == user_id_status.STATUS_NOT_AVAILABLE and user_code ~= nil) then
     local code_state = device:get_field(constants.CODE_STATE)
     return user_code == "**********" or user_code == nil or (code_state ~= nil and code_state["setName"..cmd.args.user_identifier] ~= nil)
@@ -71,7 +63,6 @@ local function user_code_report_handler(self, device, cmd)
     local reported_user_id_status = cmd.args.user_id_status
 
     if credential_index == 0 and reported_user_id_status == user_id_status.AVAILABLE then
-      -- master code changed, clear all credentials
       tables.delete_all_entries(device, "credentials")
       tables.delete_all_entries(device, "users")
     end
@@ -100,7 +91,7 @@ local schlage_lock = {
       [UserCode.REPORT] = user_code_report_handler
     },
     [cc.CONFIGURATION] = {
-      [Configuration.REPORT] = schlage_configuration_report
+      [Configuration.REPORT] = configuration_report
     },
     [cc.BASIC] = {
       [Basic.SET] = basic_set_handler
@@ -117,12 +108,5 @@ local schlage_lock = {
   NAME = "Schlage Lock",
   can_handle = require("schlage-lock.can_handle"),
 }
-
-for capability_id, commands in pairs(schlage_features.command_params) do
-  schlage_lock.capability_handlers[capability_id] = {}
-  for command_name, _ in pairs(commands) do
-    schlage_lock.capability_handlers[capability_id][command_name] = schlage_features.setting_command
-  end
-end
 
 return schlage_lock
