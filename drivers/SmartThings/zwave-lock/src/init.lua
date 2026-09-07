@@ -18,9 +18,16 @@ local consts              = require "lock_utils.constants"
 local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
+local schlage_features   = require "schlage-lock.features"
 
 
 local LockLifecycle = {}
+
+local function refresh_handler(driver, device, cmd)
+  capability_handlers.refresh(driver, device, cmd)
+  schlage_features.emit_device_network_id(device)
+  schlage_features.refresh_settings(device)
+end
 
 function LockLifecycle.device_added(driver, device)
   if device:supports_capability(capabilities.tamperAlert) then
@@ -32,6 +39,8 @@ function LockLifecycle.device_added(driver, device)
     command = capabilities.refresh.commands.refresh.NAME,
     args = {}
   })
+  schlage_features.emit_device_network_id(device)
+  schlage_features.refresh_settings(device)
 end
 
 function LockLifecycle.init(driver, device)
@@ -96,7 +105,7 @@ local driver_template = {
       [capabilities.lockCredentials.commands.deleteAllCredentials.NAME] = capability_handlers.delete_all_credentials,
     },
     [capabilities.refresh.ID] = {
-      [capabilities.refresh.commands.refresh.NAME] = capability_handlers.refresh,
+      [capabilities.refresh.commands.refresh.NAME] = refresh_handler,
     },
   },
   supported_capabilities = {
@@ -110,6 +119,13 @@ local driver_template = {
   sub_drivers = require("sub_drivers"),
   shared_device_thread_enabled = true,
 }
+
+for capability_id, commands in pairs(schlage_features.command_params) do
+  driver_template.capability_handlers[capability_id] = {}
+  for command_name, _ in pairs(commands) do
+    driver_template.capability_handlers[capability_id][command_name] = schlage_features.setting_command
+  end
+end
 
 defaults.register_for_default_handlers(driver_template, driver_template.supported_capabilities)
 local lock = ZwaveDriver("zwave_lock", driver_template)
