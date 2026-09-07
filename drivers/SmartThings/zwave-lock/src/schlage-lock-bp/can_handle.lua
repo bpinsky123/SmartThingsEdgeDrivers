@@ -11,7 +11,7 @@ local SCHLAGE_FINGERPRINTS = {
 return function(_, _, device, _)
   for _, fingerprint in ipairs(SCHLAGE_FINGERPRINTS) do
     if device:id_match(fingerprint.manufacturer_id, fingerprint.product_type, fingerprint.product_id) then
-      return true
+      return true, require("schlage-lock-bp")
     end
   end
 
