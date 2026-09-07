@@ -18,7 +18,7 @@ local consts              = require "lock_utils.constants"
 local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
-local LockCodesDefaults  = require "st.zwave.defaults.lock_codes"
+local LockCodesDefaults  = require "st.zwave.defaults.lockCodes"
 
 
 local LockLifecycle = {}
