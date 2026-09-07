@@ -52,7 +52,9 @@ local function refresh_handler(driver, device)
   if device.preferences.refreshCodes then
     LockCodesDefaults.get_refresh_commands(driver, device, "main", 0)
   end
-  features.refresh_settings(device)
+  device.thread:call_with_delay(2, function()
+    features.refresh_settings(device)
+  end)
 end
 
 local function configuration_report(_, device, cmd)
