@@ -1,7 +1,7 @@
 local capabilities = require "st.capabilities"
 local Configuration = (require "st.zwave.CommandClass.Configuration")({ version = 2 })
 local Notification = (require "st.zwave.CommandClass.Notification")({ version = 3 })
-
+local log = require "log"
 local M = {}
 
 M.capabilities = {
