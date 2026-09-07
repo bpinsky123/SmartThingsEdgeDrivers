@@ -1,4 +1,4 @@
-name: schlage-be468
+name: bp-schlage-be468-legacy
 components:
 - id: main
   label: Main
@@ -6,6 +6,8 @@ components:
   - id: lock
     version: 1
   - id: lockCodes
+    version: 1
+  - id: heartsample19211.lockActivity
     version: 1
   - id: tamperAlert
     version: 1
@@ -29,8 +31,6 @@ components:
   - id: heartsample19211.lockAndLeave
     version: 1
   - id: heartsample19211.vacationMode
-    version: 1
-  - id: heartsample19211.lockActivity
     version: 1
   - id: heartsample19211.deviceNetworkId
     version: 1
