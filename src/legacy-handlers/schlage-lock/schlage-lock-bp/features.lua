@@ -53,21 +53,10 @@ function M.configuration_report(device, cmd)
 end
 
 function M.refresh_settings(device)
-  -- Track the escalating execution window delay (starts at 1.0 second)
-  local query_delay = 1.0
-
   for parameter, setting in pairs(params) do
     local component = setting_component(device)
     if component and device:supports_capability_by_id(setting.cap.ID, component.id) then
-      
-      -- THE FIX: Changed device:log_info to the correct global log.info call
-      device.thread:call_with_delay(query_delay, function()
-        log.info(string.format("[Paced Refresh] Polling Schlage parameter %s", tostring(parameter)))
-        device:send(Configuration:Get({ parameter_number = parameter }))
-      end)
-
-      -- Increment the timer delay by 1.2 seconds for the next parameter item
-      query_delay = query_delay + 1.2
+      device:send(Configuration:Get({ parameter_number = parameter }))
     end
   end
 end
