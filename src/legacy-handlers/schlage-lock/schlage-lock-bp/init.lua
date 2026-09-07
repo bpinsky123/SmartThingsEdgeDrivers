@@ -30,9 +30,9 @@ end
 
 local function capability_handlers()
   local handlers = {}
-  for capability_id, commands in pairs(features.command_params) do
-    local capability = capabilities[capability_id]
-    if capability then
+  for _, capability in pairs(features.capabilities) do
+    local commands = capability and features.command_params[capability.ID]
+    if commands then
       local mapped_commands = {}
       for command_name in pairs(commands) do
         local command = capability.commands[command_name]
@@ -92,6 +92,8 @@ return {
   },
   lifecycle_handlers = {
     init = init,
+    added = init,
+    driverSwitched = init,
     doConfigure = do_configure,
   },
 }
