@@ -18,6 +18,7 @@ local consts              = require "lock_utils.constants"
 local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
+local LockCodesDefaults  = require "st.zwave.defaults.lock_codes"
 
 
 local LockLifecycle = {}
@@ -59,6 +60,15 @@ function LockLifecycle.driver_switched(driver, device)
   device:try_update_metadata({ provisioning_state = "PROVISIONED" })
 end
 
+local function refresh(driver, device, command)
+  capability_handlers.refresh(driver, device, command)
+
+  if (device.profile.name == "bp-schlage-be469-legacy" or device.profile.name == "bp-schlage-be468-legacy")
+      and device.preferences.refreshCodes then
+    LockCodesDefaults.get_refresh_commands(driver, device, "main", 0)
+  end
+end
+
 local driver_template = {
   lifecycle_handlers = {
     added = LockLifecycle.device_added,
@@ -96,7 +106,7 @@ local driver_template = {
       [capabilities.lockCredentials.commands.deleteAllCredentials.NAME] = capability_handlers.delete_all_credentials,
     },
     [capabilities.refresh.ID] = {
-      [capabilities.refresh.commands.refresh.NAME] = capability_handlers.refresh,
+      [capabilities.refresh.commands.refresh.NAME] = refresh,
     },
   },
   supported_capabilities = {

@@ -1,4 +1,4 @@
-name: bp-schlage-be468-legacy
+name: bp-schlage-be469-legacy
 components:
 - id: main
   label: Main
@@ -33,8 +33,6 @@ components:
   - id: heartsample19211.vacationMode
     version: 1
   - id: heartsample19211.deviceNetworkId
-    version: 1
-  - id: refresh
     version: 1
 preferences:
 - title: Length of user code
