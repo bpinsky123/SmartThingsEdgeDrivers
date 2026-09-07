@@ -214,6 +214,9 @@ local schlage_lock = {
   lifecycle_handlers = {
     doConfigure = do_configure,
   },
+  sub_drivers = {
+    require("legacy-handlers.schlage-lock.schlage-be469"),
+  },
   NAME = "Schlage Lock",
   can_handle = require("legacy-handlers.schlage-lock.can_handle"),
 }
