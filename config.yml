@@ -1,6 +1,6 @@
-name: 'Z-Wave Lock'
-packageKey: 'zwave-lock'
+name: 'Z-Wave Lock BP'
+packageKey: 'zwave-lock-bp'
 permissions:
   zwave: {}
-description: "SmartThings driver for Z-Wave lock devices"
+description: "BP-enhanced SmartThings driver for Z-Wave lock devices"
 vendorSupportInformation: "https://support.smartthings.com"
