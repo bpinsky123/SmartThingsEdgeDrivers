@@ -16,6 +16,7 @@ local Basic = (require "st.zwave.CommandClass.Basic")({version=1})
 local Association = (require "st.zwave.CommandClass.Association")({version=1})
 
 local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
+local schlage_features = require "schlage-lock.features"
 
 local SCHLAGE_LOCK_CODE_LENGTH_PARAM = {number = 16, size = 1}
 
@@ -75,6 +76,8 @@ end
 local function do_configure(self, device)
   device:send(Configuration:Get({parameter_number = SCHLAGE_LOCK_CODE_LENGTH_PARAM.number}))
   device:send(Association:Set({grouping_identifier = 2, node_ids = {self.environment_info.hub_zwave_id}}))
+  schlage_features.emit_device_network_id(device)
+  schlage_features.refresh_settings(device)
 end
 
 local function basic_set_handler(self, device, cmd)
@@ -96,6 +99,11 @@ local function configuration_report(self, device, cmd)
     end
     device:emit_event(capabilities.lockCodes.codeLength(reported_code_length))
   end
+end
+
+local function schlage_configuration_report(self, device, cmd)
+  configuration_report(self, device, cmd)
+  schlage_features.configuration_report(device, cmd)
 end
 
 local function is_user_code_report_mfr_specific(device, cmd)
@@ -162,7 +170,7 @@ local schlage_lock = {
       [UserCode.REPORT] = user_code_report_handler
     },
     [cc.CONFIGURATION] = {
-      [Configuration.REPORT] = configuration_report
+      [Configuration.REPORT] = schlage_configuration_report
     },
     [cc.BASIC] = {
       [Basic.SET] = basic_set_handler
@@ -174,5 +182,12 @@ local schlage_lock = {
   NAME = "Schlage Lock",
   can_handle = require("legacy-handlers.schlage-lock.can_handle"),
 }
+
+for capability_id, commands in pairs(schlage_features.command_params) do
+  schlage_lock.capability_handlers[capability_id] = {}
+  for command_name, _ in pairs(commands) do
+    schlage_lock.capability_handlers[capability_id][command_name] = schlage_features.setting_command
+  end
+end
 
 return schlage_lock
