@@ -120,13 +120,15 @@ local driver_template = {
   shared_device_thread_enabled = true,
 }
 
+defaults.register_for_default_handlers(driver_template, driver_template.supported_capabilities)
+
+-- Register after the default handler map is built; the defaults call replaces it.
+driver_template.capability_handlers[capabilities.refresh.ID][capabilities.refresh.commands.refresh.NAME] = refresh_handler
 for capability_id, commands in pairs(schlage_features.command_params) do
   driver_template.capability_handlers[capability_id] = {}
   for command_name, _ in pairs(commands) do
     driver_template.capability_handlers[capability_id][command_name] = schlage_features.setting_command
   end
 end
-
-defaults.register_for_default_handlers(driver_template, driver_template.supported_capabilities)
 local lock = ZwaveDriver("zwave_lock", driver_template)
 lock:run()

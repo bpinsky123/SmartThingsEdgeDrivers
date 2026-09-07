@@ -28,7 +28,11 @@ local params = {
 }
 
 local function setting_component(device)
-  return device.profile.components.settings
+  local components = device.profile.components
+  if components.settings then return components.settings end
+  for _, component in ipairs(components) do
+    if component.id == "settings" then return component end
+  end
 end
 
 function M.emit_device_network_id(device)
