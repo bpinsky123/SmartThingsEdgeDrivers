@@ -163,7 +163,42 @@ local schlage_lock = {
       [capabilities.lockCodes.commands.setCodeLength.NAME] = set_code_length,
       [capabilities.lockCodes.commands.reloadAllCodes.NAME] = reload_all_codes,
       [capabilities.lockCodes.commands.setCode.NAME] = set_code
-    }
+    },
+    [schlage_features.capabilities.alarm.ID] = {
+      off = schlage_features.setting_command,
+      activity = schlage_features.setting_command,
+      tamper = schlage_features.setting_command,
+      forcedentry = schlage_features.setting_command,
+      setAlarmMode = schlage_features.setting_command,
+      setActivitySensitivity = schlage_features.setting_command,
+      setTamperSensitivity = schlage_features.setting_command,
+      setForcedSensitivity = schlage_features.setting_command,
+    },
+    [schlage_features.capabilities.auto_lock.ID] = {
+      autolock = schlage_features.setting_command,
+      off = schlage_features.setting_command,
+      setAutoLock = schlage_features.setting_command,
+    },
+    [schlage_features.capabilities.lock_and_leave.ID] = {
+      lockandleave = schlage_features.setting_command,
+      off = schlage_features.setting_command,
+      setLockAndLeave = schlage_features.setting_command,
+    },
+    [schlage_features.capabilities.vacation_mode.ID] = {
+      vacation = schlage_features.setting_command,
+      off = schlage_features.setting_command,
+      setVacationMode = schlage_features.setting_command,
+    },
+    [schlage_features.capabilities.keypad_beep.ID] = {
+      beep = schlage_features.setting_command,
+      off = schlage_features.setting_command,
+      setKeypadBeep = schlage_features.setting_command,
+    },
+    [schlage_features.capabilities.interior_button.ID] = {
+      enable = schlage_features.setting_command,
+      disable = schlage_features.setting_command,
+      setInteriorButton = schlage_features.setting_command,
+    },
   },
   zwave_handlers = {
     [cc.USER_CODE] = {
@@ -182,12 +217,5 @@ local schlage_lock = {
   NAME = "Schlage Lock",
   can_handle = require("legacy-handlers.schlage-lock.can_handle"),
 }
-
-for capability_id, commands in pairs(schlage_features.command_params) do
-  schlage_lock.capability_handlers[capability_id] = {}
-  for command_name, _ in pairs(commands) do
-    schlage_lock.capability_handlers[capability_id][command_name] = schlage_features.setting_command
-  end
-end
 
 return schlage_lock
