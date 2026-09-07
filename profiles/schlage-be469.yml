@@ -45,3 +45,10 @@ preferences:
   definition:
     minimum: 4
     maximum: 8
+- title: Refresh user codes
+  name: refreshCodes
+  description: Request every user-code slot when Refresh is pressed.
+  required: false
+  preferenceType: boolean
+  definition:
+    default: false

@@ -5,6 +5,7 @@ local capabilities = require "st.capabilities"
 local cc = require "st.zwave.CommandClass"
 local Configuration = (require "st.zwave.CommandClass.Configuration")({ version = 2 })
 local Association = (require "st.zwave.CommandClass.Association")({ version = 1 })
+local DoorLock = (require "st.zwave.CommandClass.DoorLock")({ version = 1 })
 local Notification = (require "st.zwave.CommandClass.Notification")({ version = 3 })
 local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
 local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
@@ -46,6 +47,14 @@ local function capability_handlers()
   return handlers
 end
 
+local function refresh_handler(driver, device)
+  device:send(DoorLock:OperationGet({}))
+  if device.preferences.refreshCodes then
+    LockCodesDefaults.get_refresh_commands(driver, device, "main", 0)
+  end
+  features.refresh_settings(device)
+end
+
 local function configuration_report(_, device, cmd)
   if cmd.args.parameter_number == 16 then
     local current = device:get_latest_state(
@@ -84,7 +93,13 @@ end
 return {
   NAME = "Schlage Lock BP",
   can_handle = can_handle,
-  capability_handlers = capability_handlers(),
+  capability_handlers = (function()
+    local handlers = capability_handlers()
+    handlers[capabilities.refresh.ID] = {
+      [capabilities.refresh.commands.refresh.NAME] = refresh_handler,
+    }
+    return handlers
+  end)(),
   zwave_handlers = {
     [cc.CONFIGURATION] = {
       [Configuration.REPORT] = configuration_report,
