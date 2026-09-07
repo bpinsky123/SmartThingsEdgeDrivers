@@ -27,6 +27,8 @@ local params = {
   [15] = { cap = M.capabilities.auto_lock, attr = "autoLock", map = {[0] = "off", [-1] = "autolock"} },
 }
 
+local refresh_parameters = { 3, 4, 5, 7, 8, 9, 10, 11, 15 }
+
 local function setting_component(device)
   local components = device.profile.components
   if components.settings then return components.settings end
@@ -53,7 +55,8 @@ function M.configuration_report(device, cmd)
 end
 
 function M.refresh_settings(device)
-  for parameter, setting in pairs(params) do
+  for _, parameter in ipairs(refresh_parameters) do
+    local setting = params[parameter]
     local component = setting_component(device)
     if component and device:supports_capability_by_id(setting.cap.ID, component.id) then
       device:send(Configuration:Get({ parameter_number = parameter }))
