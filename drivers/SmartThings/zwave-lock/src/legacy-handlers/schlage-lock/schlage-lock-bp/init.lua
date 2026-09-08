@@ -99,7 +99,12 @@ local function call_parent_handler(handlers, driver, device, event, args)
   end
 
   for _, handler in ipairs(handlers or {}) do
-    hlocal function legacy_user_lookup(device, code_id)
+    handler(driver, device, event, args)
+  end
+end
+
+
+local function legacy_user_lookup(device, code_id)
   local slot = tonumber(code_id)
   if slot == nil then return nil, nil end
 
@@ -121,10 +126,6 @@ local function notification_report(driver, device, cmd)
   call_parent_handler(parent_handlers, driver, device, cmd)
 
   features.activity_from_notification(device, cmd, legacy_user_lookup)
-end
-.
-    return nil, tonumber(code_id)
-  end)
 end
 
 local function bp_added_handler(driver, device, event, args)
