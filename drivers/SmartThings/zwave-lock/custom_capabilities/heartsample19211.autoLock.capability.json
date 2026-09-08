@@ -1,1 +1,45 @@
-{"name":"Auto Lock","attributes":{"autoLock":{"schema":{"type":"object","properties":{"value":{"type":"string","enum":["autolock","off"]}},"additionalProperties":false,"required":["value"]},"setter":"setAutoLock","enumCommands":[{"command":"autolock","value":"autolock"},{"command":"off","value":"off"}]}},"commands":{"setAutoLock":{"name":"setAutoLock","arguments":[{"name":"mode","optional":false,"schema":{"type":"string","enum":["autolock","off"]}}],"sensitive":false},"autolock":{"name":"autolock","arguments":[],"sensitive":false},"off":{"name":"off","arguments":[],"sensitive":false}}}
+{
+  "name": "Auto Lock",
+  "attributes": {
+    "autoLock": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "autolock",
+              "off"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ]
+      },
+      "enumCommands": [
+        {
+          "command": "autolock",
+          "value": "autolock"
+        },
+        {
+          "command": "off",
+          "value": "off"
+        }
+      ]
+    }
+  },
+  "commands": {
+    "autolock": {
+      "name": "autolock",
+      "arguments": [],
+      "sensitive": false
+    },
+    "off": {
+      "name": "off",
+      "arguments": [],
+      "sensitive": false
+    }
+  }
+}
