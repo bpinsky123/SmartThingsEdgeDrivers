@@ -1,0 +1,47 @@
+{
+  "name": "Lock Activity",
+  "attributes": {
+    "activity": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": ["keypadLocked", "keypadUnlocked", "manualLocked", "manualUnlocked", "remoteLocked", "remoteUnlocked", "autoLocked", "lockJammed", "unknown"]
+          }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      },
+      "enumCommands": []
+    },
+    "userName": {
+      "schema": {
+        "type": "object",
+        "properties": {"value": {"type": "string"}},
+        "additionalProperties": false,
+        "required": ["value"]
+      },
+      "enumCommands": []
+    },
+    "userIndex": {
+      "schema": {
+        "type": "object",
+        "properties": {"value": {"type": "integer", "minimum": 0}},
+        "additionalProperties": false,
+        "required": ["value"]
+      },
+      "enumCommands": []
+    },
+    "message": {
+      "schema": {
+        "type": "object",
+        "properties": {"value": {"type": "string"}},
+        "additionalProperties": false,
+        "required": ["value"]
+      },
+      "enumCommands": []
+    }
+  },
+  "commands": {}
+}
