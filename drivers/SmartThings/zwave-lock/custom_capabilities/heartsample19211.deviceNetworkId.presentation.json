@@ -1,0 +1,7 @@
+{
+  "dashboard": {"states": [{"label": "{{deviceNetworkId.value}}"}], "actions": [], "panelItems": []},
+  "detailView": [{"label": "Device Network ID", "displayType": "state", "state": {"label": "{{deviceNetworkId.value}}"}}],
+  "automation": {"conditions": [], "actions": []},
+  "id": "heartsample19211.deviceNetworkId",
+  "version": 1
+}

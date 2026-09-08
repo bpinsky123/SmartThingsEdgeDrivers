@@ -1,0 +1,45 @@
+{
+  "name": "Lock and Leave",
+  "attributes": {
+    "lockAndLeave": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "lockandleave",
+              "off"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ]
+      },
+      "enumCommands": [
+        {
+          "command": "lockandleave",
+          "value": "lockandleave"
+        },
+        {
+          "command": "off",
+          "value": "off"
+        }
+      ]
+    }
+  },
+  "commands": {
+    "lockandleave": {
+      "name": "lockandleave",
+      "arguments": [],
+      "sensitive": false
+    },
+    "off": {
+      "name": "off",
+      "arguments": [],
+      "sensitive": false
+    }
+  }
+}

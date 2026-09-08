@@ -1,0 +1,45 @@
+{
+  "name": "Keypad Beep",
+  "attributes": {
+    "keypadBeep": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "beep",
+              "off"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ]
+      },
+      "enumCommands": [
+        {
+          "command": "beep",
+          "value": "beep"
+        },
+        {
+          "command": "off",
+          "value": "off"
+        }
+      ]
+    }
+  },
+  "commands": {
+    "beep": {
+      "name": "beep",
+      "arguments": [],
+      "sensitive": false
+    },
+    "off": {
+      "name": "off",
+      "arguments": [],
+      "sensitive": false
+    }
+  }
+}
