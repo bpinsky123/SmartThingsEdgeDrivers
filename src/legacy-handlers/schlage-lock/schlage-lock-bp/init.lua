@@ -2,6 +2,7 @@
 -- Licensed under the Apache License, Version 2.0
 
 local capabilities = require "st.capabilities"
+local constants = require "st.zwave.constants"
 local cc = require "st.zwave.CommandClass"
 local Configuration = (require "st.zwave.CommandClass.Configuration")({ version = 2 })
 local Association = (require "st.zwave.CommandClass.Association")({ version = 1 })
@@ -98,9 +99,20 @@ local function call_parent_handler(handlers, driver, device, event, args)
   end
 
   for _, handler in ipairs(handlers or {}) do
-    handler(driver, device, event, args)
+    hlocal function legacy_user_lookup(device, code_id)
+  local slot = tonumber(code_id)
+  if slot == nil then return nil, nil end
+
+  local lock_codes = device:get_field(constants.LOCK_CODES)
+  if type(lock_codes) ~= "table" then lock_codes = {} end
+
+  local name = lock_codes[slot] or lock_codes[tostring(slot)]
+  if (name == nil or name == "") and slot == 0 then
+    name = "Master Code"
   end
+  return name, slot
 end
+
 
 local function notification_report(driver, device, cmd)
   -- Preserve every stock notification side effect before adding BP activity.
@@ -108,9 +120,9 @@ local function notification_report(driver, device, cmd)
     and driver.zwave_handlers[cc.NOTIFICATION][Notification.REPORT]
   call_parent_handler(parent_handlers, driver, device, cmd)
 
-  features.activity_from_notification(device, cmd, function(code_id)
-    -- Stage 1: report the verified Schlage user-code slot.  Name lookup
-    -- from legacy lockCodes data is added only after this path is tested.
+  features.activity_from_notification(device, cmd, legacy_user_lookup)
+end
+.
     return nil, tonumber(code_id)
   end)
 end
