@@ -1,1 +1,45 @@
-{"name":"Keypad Beep","attributes":{"keypadBeep":{"schema":{"type":"object","properties":{"value":{"type":"string","enum":["beep","off"]}},"additionalProperties":false,"required":["value"]},"setter":"setKeypadBeep","enumCommands":[{"command":"beep","value":"beep"},{"command":"off","value":"off"}]}},"commands":{"setKeypadBeep":{"name":"setKeypadBeep","arguments":[{"name":"mode","optional":false,"schema":{"type":"string","enum":["beep","off"]}}],"sensitive":false},"beep":{"name":"beep","arguments":[],"sensitive":false},"off":{"name":"off","arguments":[],"sensitive":false}}}
+{
+  "name": "Keypad Beep",
+  "attributes": {
+    "keypadBeep": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "beep",
+              "off"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ]
+      },
+      "enumCommands": [
+        {
+          "command": "beep",
+          "value": "beep"
+        },
+        {
+          "command": "off",
+          "value": "off"
+        }
+      ]
+    }
+  },
+  "commands": {
+    "beep": {
+      "name": "beep",
+      "arguments": [],
+      "sensitive": false
+    },
+    "off": {
+      "name": "off",
+      "arguments": [],
+      "sensitive": false
+    }
+  }
+}
