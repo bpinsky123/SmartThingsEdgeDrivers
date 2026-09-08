@@ -1,1 +1,44 @@
-{"name":"Interior Schlage Button","attributes":{"interiorButton":{"schema":{"type":"object","properties":{"value":{"type":"string","enum":["enable","disable"]}},"additionalProperties":false,"required":["value"]},"setter":"setInteriorButton","enumCommands":[{"command":"disable","value":"disable"},{"command":"enable","value":"enable"}]}},"commands":{"setInteriorButton":{"name":"setInteriorButton","arguments":[{"name":"mode","optional":false,"schema":{"type":"string","enum":["enable","disable"]}}],"sensitive":false},"disable":{"name":"disable","arguments":[],"sensitive":false},"enable":{"name":"enable","arguments":[],"sensitive":false}}}
+me": "Interior Schlage Button",
+  "attributes": {
+    "interiorButton": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ]
+      },
+      "enumCommands": [
+        {
+          "command": "enable",
+          "value": "enable"
+        },
+        {
+          "command": "disable",
+          "value": "disable"
+        }
+      ]
+    }
+  },
+  "commands": {
+    "enable": {
+      "name": "enable",
+      "arguments": [],
+      "sensitive": false
+    },
+    "disable": {
+      "name": "disable",
+      "arguments": [],
+      "sensitive": false
+    }
+  }
+}
