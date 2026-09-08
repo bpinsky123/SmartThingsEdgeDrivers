@@ -180,14 +180,24 @@ function M.activity_from_notification(device, cmd, user_lookup)
   if not detail then return end
   if event == access.KEYPAD_LOCK_OPERATION or event == access.KEYPAD_UNLOCK_OPERATION then
     local parameter = cmd.args.event_parameter
-    local code_id = cmd.args.v1_alarm_level
+    local code_id = tonumber(cmd.args.v1_alarm_level)
+    -- A zero alarm level without an event parameter is not a reported user slot.
+    -- Do not mislabel an unattributed keypad operation as the Master Code.
+    local explicit_code_id = code_id ~= nil and code_id ~= 0
     if parameter and #parameter > 0 then
       local bytes = {parameter:byte(1, -1)}
       code_id = #bytes == 1 and bytes[1] or bytes[3]
+      explicit_code_id = true
     end
-    local user_name, user_index = user_lookup(tonumber(code_id))
-    if user_name and user_name ~= "" then detail[2] = detail[2] .. " by " .. user_name end
-    M.emit_activity(device, detail[1], detail[2], user_name, user_index or tonumber(code_id))
+
+    local user_name, user_index
+    if explicit_code_id then
+      user_name, user_index = user_lookup(code_id)
+    end
+
+    local message = detail[2]
+    if user_name and user_name ~= "" then message = message .. " by " .. user_name end
+    M.emit_activity(device, detail[1], message, user_name, user_index)
   else
     M.emit_activity(device, detail[1], detail[2])
   end
