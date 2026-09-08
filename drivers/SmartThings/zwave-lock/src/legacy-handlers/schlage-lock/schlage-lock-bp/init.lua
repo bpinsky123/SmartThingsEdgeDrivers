@@ -11,10 +11,10 @@ local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
 local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
 
 local FINGERPRINTS = {
-  { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469-legacy-v2" },
-  { mfr = 0x003B, prod = 0x6341, model = 0x5044, profile = "bp-schlage-be469-legacy-v2" },
-  { mfr = 0x003B, prod = 0x0001, model = 0x0468, profile = "bp-schlage-be468-legacy-v2" },
-  { mfr = 0x003B, prod = 0x6349, model = 0x5044, profile = "bp-schlage-be468-legacy-v2" },
+  { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469-legacy" },
+  { mfr = 0x003B, prod = 0x6341, model = 0x5044, profile = "bp-schlage-be469-legacy" },
+  { mfr = 0x003B, prod = 0x0001, model = 0x0468, profile = "bp-schlage-be468-legacy" },
+  { mfr = 0x003B, prod = 0x6349, model = 0x5044, profile = "bp-schlage-be468-legacy" },
 }
 
 local function matching_fingerprint(device)
