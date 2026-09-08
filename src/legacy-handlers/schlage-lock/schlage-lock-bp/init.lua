@@ -102,6 +102,19 @@ local function call_parent_handler(handlers, driver, device, event, args)
   end
 end
 
+local function notification_report(driver, device, cmd)
+  -- Preserve every stock notification side effect before adding BP activity.
+  local parent_handlers = driver.zwave_handlers[cc.NOTIFICATION]
+    and driver.zwave_handlers[cc.NOTIFICATION][Notification.REPORT]
+  call_parent_handler(parent_handlers, driver, device, cmd)
+
+  features.activity_from_notification(device, cmd, function(code_id)
+    -- Stage 1: report the verified Schlage user-code slot.  Name lookup
+    -- from legacy lockCodes data is added only after this path is tested.
+    return nil, tonumber(code_id)
+  end)
+end
+
 local function bp_added_handler(driver, device, event, args)
   -- Keep BP profile selection and Device Network ID reporting.
   init(driver, device)
@@ -174,6 +187,9 @@ return {
   zwave_handlers = {
     [cc.CONFIGURATION] = {
       [Configuration.REPORT] = configuration_report,
+    },
+    [cc.NOTIFICATION] = {
+      [Notification.REPORT] = notification_report,
     },
   },
   lifecycle_handlers = {
