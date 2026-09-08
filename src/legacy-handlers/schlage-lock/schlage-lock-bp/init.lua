@@ -52,9 +52,7 @@ local function refresh_handler(driver, device)
   if device.preferences.refreshCodes then
     LockCodesDefaults.get_refresh_commands(driver, device, "main", 0)
   end
-  device.thread:call_with_delay(2, function()
     features.refresh_settings(device)
-  end)
 end
 
 local function configuration_report(_, device, cmd)
@@ -92,6 +90,10 @@ local function do_configure(driver, device)
   features.refresh_settings(device)
 end
 
+local function driver_switched(driver, device)
+  init(driver, device)
+  device:try_update_metadata({ provisioning_state = "PROVISIONED" })
+end
 return {
   NAME = "Schlage Lock BP",
   can_handle = can_handle,
@@ -110,7 +112,7 @@ return {
   lifecycle_handlers = {
     init = init,
     added = init,
-    driverSwitched = init,
+    driverSwitched = driver_switched,
     doConfigure = do_configure,
   },
 }
