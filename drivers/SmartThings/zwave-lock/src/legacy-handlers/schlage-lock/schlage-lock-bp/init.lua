@@ -9,6 +9,9 @@ local DoorLock = (require "st.zwave.CommandClass.DoorLock")({ version = 1 })
 local Notification = (require "st.zwave.CommandClass.Notification")({ version = 3 })
 local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
 local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
+local stock_capability_handlers = require "lock_handlers.capabilities"
+local SETTINGS_REFRESH_ISSUED = "bp_settings_refresh_issued"
+local log = require "log"
 
 local FINGERPRINTS = {
   { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469-legacy" },
@@ -47,12 +50,18 @@ local function capability_handlers()
   return handlers
 end
 
-local function refresh_handler(driver, device)
-  device:send(DoorLock:OperationGet({}))
-  if device.preferences.refreshCodes then
-    LockCodesDefaults.get_refresh_commands(driver, device, "main", 0)
+local function refresh_handler(driver, device, command)
+  if command.component == "main" then
+    -- Fast stock refresh for the primary device card state.
+    stock_capability_handlers.refresh(driver, device, command)
+
+    if device.preferences.refreshCodes then
+      LockCodesDefaults.get_refresh_commands(driver, device, "main", 0)
+    end
   end
-    features.refresh_settings(device)
+
+  -- Start the deduplicated, response-paced Schlage configuration scan.
+  features.refresh_settings(device)
 end
 
 local function configuration_report(_, device, cmd)
@@ -75,10 +84,31 @@ end
 
 local function init(_, device)
   local fingerprint = matching_fingerprint(device)
-  if fingerprint then
+
+  if fingerprint and device.profile.name ~= fingerprint.profile then
     device:try_update_metadata({ profile = fingerprint.profile })
   end
-  features.emit_device_network_id(device)
+
+ features.emit_device_network_id(device)
+end
+
+local function call_parent_handler(handlers, driver, device, event, args)
+  if type(handlers) == "function" then
+    handlers = { handlers }
+  end
+
+  for _, handler in ipairs(handlers or {}) do
+    handler(driver, device, event, args)
+  end
+end
+
+local function bp_added_handler(driver, device, event, args)
+  -- Keep BP profile selection and Device Network ID reporting.
+  init(driver, device)
+
+  -- Preserve stock initialization: initial refresh, battery/lock state,
+  -- lock-code setup, tamper clear, and stock DNi handling.
+  call_parent_handler(driver.lifecycle_handlers.added, driver, device, event, args)
 end
 
 local function do_configure(driver, device)
@@ -94,6 +124,43 @@ local function driver_switched(driver, device)
   init(driver, device)
   device:try_update_metadata({ provisioning_state = "PROVISIONED" })
 end
+
+local function info_changed(driver, device, event, args)
+  call_parent_handler(driver.lifecycle_handlers.infoChanged, driver, device, event, args)
+
+  if device:supports_capability(capabilities.tamperAlert) then
+    device:emit_event(capabilities.tamperAlert.tamper.clear())
+  end
+
+local activity = features.capabilities.activity
+
+if device:supports_capability(activity) then
+  local current = device:get_latest_state(
+    "main", activity.ID, activity.activity.NAME)
+
+  if current == nil then
+    features.emit_activity(
+      device,
+      "unknown",
+      "No lock activity yet",
+      "",
+      0
+    )
+  end
+end
+
+  if device:get_field(SETTINGS_REFRESH_ISSUED) then
+    return
+  end
+
+  features.emit_device_network_id(device)
+
+  if features.refresh_settings(device) then
+    device:set_field(SETTINGS_REFRESH_ISSUED, true)
+    log.info("BP infoChanged: started paced Schlage settings refresh")
+  end
+end
+
 return {
   NAME = "Schlage Lock BP",
   can_handle = can_handle,
@@ -111,8 +178,10 @@ return {
   },
   lifecycle_handlers = {
     init = init,
-    added = init,
+    added = bp_added_handler,
+--    added = init,
     driverSwitched = driver_switched,
+    infoChanged = info_changed,
     doConfigure = do_configure,
   },
 }
