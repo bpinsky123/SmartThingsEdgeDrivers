@@ -28,6 +28,48 @@ local params = {
 }
 
 local refresh_parameters = { 3, 4, 5, 7, 8, 9, 10, 11, 15 }
+local SETTINGS_REFRESH_QUEUE = "bp_settings_refresh_queue"
+local SETTINGS_REFRESH_IN_FLIGHT = "bp_settings_refresh_in_flight"
+local SETTINGS_REFRESH_DELAY = 0.5
+local SETTINGS_REFRESH_TIMEOUT = 10
+
+local function request_next_setting(device)
+  local queue = device:get_field(SETTINGS_REFRESH_QUEUE)
+
+  if not queue or #queue == 0 then
+    device:set_field(SETTINGS_REFRESH_QUEUE, nil)
+    device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
+    return
+  end
+
+  local parameter = table.remove(queue, 1)
+  device:set_field(SETTINGS_REFRESH_QUEUE, queue)
+  device:set_field(SETTINGS_REFRESH_IN_FLIGHT, parameter)
+
+  log.info(string.format("Requesting Schlage configuration parameter %d", parameter))
+  device:send(Configuration:Get({ parameter_number = parameter }))
+
+  -- Continue if this particular parameter never reports.
+  device.thread:call_with_delay(SETTINGS_REFRESH_TIMEOUT, function()
+    if device:get_field(SETTINGS_REFRESH_IN_FLIGHT) == parameter then
+      log.warn(string.format(
+        "Timed out waiting for Schlage configuration parameter %d", parameter))
+      device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
+      request_next_setting(device)
+    end
+  end)
+end
+
+local function advance_settings_refresh(device, parameter)
+  if device:get_field(SETTINGS_REFRESH_IN_FLIGHT) ~= parameter then
+    return
+  end
+
+  device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
+  device.thread:call_with_delay(SETTINGS_REFRESH_DELAY, function()
+    request_next_setting(device)
+  end)
+end
 
 local function setting_component(device)
   local components = device.profile.components
@@ -52,16 +94,32 @@ function M.configuration_report(device, cmd)
   if value ~= nil and component and device:supports_capability_by_id(setting.cap.ID, component.id) then
     device:emit_component_event(component, setting.cap[setting.attr](value))
   end
+  advance_settings_refresh(device, cmd.args.parameter_number)
 end
 
 function M.refresh_settings(device)
+  if device:get_field(SETTINGS_REFRESH_QUEUE) ~= nil then
+    return false
+  end
+
+  local queue = {}
+
   for _, parameter in ipairs(refresh_parameters) do
     local setting = params[parameter]
     local component = setting_component(device)
+
     if component and device:supports_capability_by_id(setting.cap.ID, component.id) then
-      device:send(Configuration:Get({ parameter_number = parameter }))
+      table.insert(queue, parameter)
     end
   end
+
+  if #queue == 0 then
+    return false
+  end
+
+  device:set_field(SETTINGS_REFRESH_QUEUE, queue)
+  request_next_setting(device)
+  return true
 end
 
 local command_params = {
