@@ -1,1 +1,230 @@
-{"dashboard":{"states":[{"label":"{{alarmMode.value}}"}],"actions":[],"panelItems":[]},"detailView":[{"label":"Alarm","displayType":"list","list":{"command":{"name":"setAlarmMode","alternatives":[{"key":"off","value":"Off"},{"key":"activity","value":"Activity"},{"key":"tamper","value":"Tamper"},{"key":"forcedentry","value":"Forced entry"}]},"state":{"value":"alarmMode.value","valueType":"string","alternatives":[{"key":"off","value":"Off"},{"key":"activity","value":"Activity"},{"key":"tamper","value":"Tamper"},{"key":"forcedentry","value":"Forced entry"}]}}},{"label":"Activity sensitivity","displayType":"slider","slider":{"range":[1,5],"step":1,"command":"setActivitySensitivity","argumentType":"integer","value":"activitySensitivity.value","valueType":"integer"}},{"label":"Tamper sensitivity","displayType":"slider","slider":{"range":[1,5],"step":1,"command":"setTamperSensitivity","argumentType":"integer","value":"tamperSensitivity.value","valueType":"integer"}},{"label":"Forced entry sensitivity","displayType":"slider","slider":{"range":[1,5],"step":1,"command":"setForcedSensitivity","argumentType":"integer","value":"forcedEntrySensitivity.value","valueType":"integer"}}],"automation":{"conditions":[{"label":"Alarm mode","displayType":"list","list":{"alternatives":[{"key":"off","value":"Off","type":"inactive"},{"key":"activity","value":"Activity","type":"active"},{"key":"tamper","value":"Tamper","type":"active"},{"key":"forcedentry","value":"Forced entry","type":"active"}],"value":"alarmMode.value","valueType":"string","multiSelectable":false}},{"label":"Activity mode sensitivity","displayType":"slider","slider":{"range":[1,5],"value":"activitySensitivity.value","valueType":"integer"}},{"label":"Tamper mode sensitivity","displayType":"slider","slider":{"range":[1,5],"value":"tamperSensitivity.value","valueType":"integer"}},{"label":"Forced entry mode sensitivity","displayType":"slider","slider":{"range":[1,5],"value":"forcedEntrySensitivity.value","valueType":"integer"}}],"actions":[{"label":"Set alarm mode","displayType":"list","list":{"alternatives":[{"key":"off","value":"Off","type":"inactive"},{"key":"activity","value":"Activity","type":"active"},{"key":"tamper","value":"Tamper","type":"active"},{"key":"forcedentry","value":"Forced entry","type":"active"}],"command":"setAlarmMode","argumentType":"string"}},{"label":"Set sensitivity for Activity mode","displayType":"slider","slider":{"range":[1,5],"command":"setActivitySensitivity","argumentType":"integer"}},{"label":"Set sensitivity for Tamper mode","displayType":"slider","slider":{"range":[1,5],"command":"setTamperSensitivity","argumentType":"integer"}},{"label":"Set sensitivity for Forced Entry mode","displayType":"slider","slider":{"range":[1,5],"command":"setForcedSensitivity","argumentType":"integer"}}]},"id":"heartsample19211.schlageLockAlarm","version":1}
+{
+  "dashboard": {
+    "states": [
+      {
+        "label": "{{alarmMode.value}}"
+      }
+    ],
+    "actions": [],
+    "panelItems": []
+  },
+  "detailView": [
+    {
+      "label": "Alarm",
+      "displayType": "list",
+      "list": {
+        "command": {
+          "name": "setAlarmMode",
+          "alternatives": [
+            {
+              "key": "off",
+              "value": "Off",
+              "type": "inactive"
+            },
+            {
+              "key": "activity",
+              "value": "Activity",
+              "type": "active"
+            },
+            {
+              "key": "tamper",
+              "value": "Tamper",
+              "type": "active"
+            },
+            {
+              "key": "forcedentry",
+              "value": "Forced entry",
+              "type": "active"
+            }
+          ],
+          "argumentType": "string"
+        },
+        "state": {
+          "value": "alarmMode.value",
+          "valueType": "string",
+          "alternatives": [
+            {
+              "key": "off",
+              "value": "Off",
+              "type": "inactive"
+            },
+            {
+              "key": "activity",
+              "value": "Activity",
+              "type": "active"
+            },
+            {
+              "key": "tamper",
+              "value": "Tamper",
+              "type": "active"
+            },
+            {
+              "key": "forcedentry",
+              "value": "Forced entry",
+              "type": "active"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Alarm",
+      "displayType": "slider",
+      "slider": {
+        "range": [1, 5],
+        "step": 1,
+        "command": "setActivitySensitivity",
+        "argumentType": "integer",
+        "value": "activitySensitivity.value",
+        "valueType": "integer"
+      }
+    },
+    {
+      "label": "Alarm",
+      "displayType": "slider",
+      "slider": {
+        "range": [1, 5],
+        "step": 1,
+        "command": "setTamperSensitivity",
+        "argumentType": "integer",
+        "value": "tamperSensitivity.value",
+        "valueType": "integer"
+      }
+    },
+    {
+      "label": "Alarm",
+      "displayType": "slider",
+      "slider": {
+        "range": [1, 5],
+        "step": 1,
+        "command": "setForcedSensitivity",
+        "argumentType": "integer",
+        "value": "forcedEntrySensitivity.value",
+        "valueType": "integer"
+      }
+    }
+  ],
+  "automation": {
+    "conditions": [
+      {
+        "label": "Alarm mode",
+        "displayType": "list",
+        "list": {
+          "alternatives": [
+            {
+              "key": "off",
+              "value": "Off",
+              "type": "inactive"
+            },
+            {
+              "key": "activity",
+              "value": "Activity",
+              "type": "active"
+            },
+            {
+              "key": "tamper",
+              "value": "Tamper",
+              "type": "active"
+            },
+            {
+              "key": "forcedentry",
+              "value": "Forced entry",
+              "type": "active"
+            }
+          ],
+          "value": "alarmMode.value",
+          "valueType": "string",
+          "multiSelectable": false
+        }
+      },
+      {
+        "label": "Activity mode sensitivity",
+        "displayType": "slider",
+        "slider": {
+          "range": [1, 5],
+          "value": "activitySensitivity.value",
+          "valueType": "integer"
+        }
+      },
+      {
+        "label": "Tamper mode sensitivity",
+        "displayType": "slider",
+        "slider": {
+          "range": [1, 5],
+          "value": "tamperSensitivity.value",
+          "valueType": "integer"
+        }
+      },
+      {
+        "label": "Forced entry mode sensitivity",
+        "displayType": "slider",
+        "slider": {
+          "range": [1, 5],
+          "value": "forcedEntrySensitivity.value",
+          "valueType": "integer"
+        }
+      }
+    ],
+    "actions": [
+      {
+        "label": "Set alarm mode",
+        "displayType": "list",
+        "list": {
+          "alternatives": [
+            {
+              "key": "off",
+              "value": "Off",
+              "type": "inactive"
+            },
+            {
+              "key": "activity",
+              "value": "Activity",
+              "type": "active"
+            },
+            {
+              "key": "tamper",
+              "value": "Tamper",
+              "type": "active"
+            },
+            {
+              "key": "forcedentry",
+              "value": "Forced entry",
+              "type": "active"
+            }
+          ],
+          "command": "setAlarmMode",
+          "argumentType": "string"
+        }
+      },
+      {
+        "label": "Set sensitivity for Activity mode",
+        "displayType": "slider",
+        "slider": {
+          "range": [1, 5],
+          "command": "setActivitySensitivity",
+          "argumentType": "integer"
+        }
+      },
+      {
+        "label": "Set sensitivity for Tamper mode",
+        "displayType": "slider",
+        "slider": {
+          "range": [1, 5],
+          "command": "setTamperSensitivity",
+          "argumentType": "integer"
+        }
+      },
+      {
+        "label": "Set sensitivity for Forced Entry mode",
+        "displayType": "slider",
+        "slider": {
+          "range": [1, 5],
+          "command": "setForcedSensitivity",
+          "argumentType": "integer"
+        }
+      }
+    ]
+  },
+  "id": "heartsample19211.schlageLockAlarm",
+  "version": 1
+}
