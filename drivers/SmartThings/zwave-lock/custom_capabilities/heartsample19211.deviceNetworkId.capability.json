@@ -4,9 +4,16 @@
     "deviceNetworkId": {
       "schema": {
         "type": "object",
-        "properties": {"value": {"type": "string"}},
+        "properties": {
+          "value": {
+            "title": "Device Network ID",
+            "type": "string"
+          }
+        },
         "additionalProperties": false,
-        "required": ["value"]
+        "required": [
+          "value"
+        ]
       },
       "enumCommands": []
     }
