@@ -21,6 +21,7 @@ local BP_PROFILE_READY = "bp_profile_ready"
 local STOCK_BATTERY_RECEIVED = "bp_stock_battery_received"
 local BOOTSTRAP_STARTED = "bp_bootstrap_started"
 local CODE_INIT_PENDING = "bp_legacy_code_init_pending"
+local CODE_LENGTH_PENDING = "bp_legacy_code_length_pending"
 local SETTINGS_AFTER_BATTERY = "bp_settings_after_battery"
 local CODE_INIT_TIMEOUT_SECONDS = 20
 local PROFILE_READY_RETRY_COUNT = "bp_profile_ready_retry_count"
@@ -75,18 +76,35 @@ local function supports_legacy_code_initialization(device)
       "main", capabilities.lockCodes.ID, capabilities.lockCodes.migrated.NAME) ~= true
 end
 
-local function begin_legacy_code_initialization(driver, device)
-  if not supports_legacy_code_initialization(device) then return end
-  if device:get_field(CODE_INIT_PENDING) then return end
-
+local function start_legacy_code_scan(device)
   device:set_field(CODE_INIT_PENDING, true)
   device:send(UserCode:UsersNumberGet({}))
+
   device.thread:call_with_delay(CODE_INIT_TIMEOUT_SECONDS, function()
     if device:get_field(CODE_INIT_PENDING) then
       device:set_field(CODE_INIT_PENDING, nil)
       log.warn("BP legacy code initialization timed out; no automatic retry")
     end
   end)
+end
+
+local function begin_legacy_code_initialization(_, device)
+  if not supports_legacy_code_initialization(device) then return end
+  if device:get_field(CODE_INIT_PENDING)
+      or device:get_field(CODE_LENGTH_PENDING) then
+    return
+  end
+
+  local code_length = device:get_latest_state(
+    "main", capabilities.lockCodes.ID, capabilities.lockCodes.codeLength.NAME)
+
+  if code_length == nil then
+    device:set_field(CODE_LENGTH_PENDING, true)
+    device:send(Configuration:Get({ parameter_number = 16 }))
+    return
+  end
+
+  start_legacy_code_scan(device)
 end
 
 -- The only BP bootstrap entry point.  It may be called by infoChanged and
@@ -122,7 +140,9 @@ local function refresh_handler(driver, device, command)
     else
       -- Later app pull-down refreshes retain the same stock-first ordering.
       device:set_field(SETTINGS_AFTER_BATTERY, true)
-      if device.preferences.refreshCodes and not device:get_field(CODE_INIT_PENDING) then
+      if device.preferences.refreshCodes
+          and not device:get_field(CODE_INIT_PENDING)
+          and not device:get_field(CODE_LENGTH_PENDING) then
         LockCodesDefaults.get_refresh_commands(driver, device, "main", 0)
       end
     end
@@ -138,6 +158,7 @@ local function configuration_report(driver, device, cmd)
     local current = device:get_latest_state(
       "main", capabilities.lockCodes.ID, capabilities.lockCodes.codeLength.NAME)
     local reported = cmd.args.configuration_value
+
     if current ~= nil and current ~= reported then
       LockCodesDefaults.zwave_handlers[cc.NOTIFICATION][Notification.REPORT](driver, device,
         Notification:Report({
@@ -145,9 +166,16 @@ local function configuration_report(driver, device, cmd)
           event = Notification.event.access_control.ALL_USER_CODES_DELETED,
         }))
     end
+
     device:emit_event(capabilities.lockCodes.codeLength(reported))
+
+    if device:get_field(CODE_LENGTH_PENDING) then
+      device:set_field(CODE_LENGTH_PENDING, nil)
+      start_legacy_code_scan(device)
+    end
     return
   end
+
   features.configuration_report(device, cmd)
 end
 
@@ -199,18 +227,21 @@ local function battery_report(driver, device, cmd)
 end
 
 local function users_number_report(driver, device, cmd)
-  -- Only the request sent after the BP settings scan may begin code scanning.
-  if not device:get_field(CODE_INIT_PENDING) then return end
-  device:set_field(CODE_INIT_PENDING, nil)
-
   local legacy_handler = LockCodesDefaults.zwave_handlers[cc.USER_CODE]
     and LockCodesDefaults.zwave_handlers[cc.USER_CODE][UserCode.USERS_NUMBER_REPORT]
+
   if type(legacy_handler) ~= "function" then
     log.error("BP cannot initialize legacy codes: default users-number handler is unavailable")
     return
   end
 
+  -- Preserve normal legacy behavior, including lockCodes.maxCodes.
   legacy_handler(driver, device, cmd)
+
+  -- Only BP's post-settings bootstrap begins a complete code scan.
+  if not device:get_field(CODE_INIT_PENDING) then return end
+
+  device:set_field(CODE_INIT_PENDING, nil)
   driver:inject_capability_command(device, {
     capability = capabilities.lockCodes.ID,
     command = capabilities.lockCodes.commands.reloadAllCodes.NAME,
