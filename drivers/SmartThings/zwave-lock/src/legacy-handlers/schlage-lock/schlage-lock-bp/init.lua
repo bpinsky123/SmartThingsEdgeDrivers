@@ -518,9 +518,45 @@ local function mark_profile_ready_and_try_bootstrap(driver, device)
   return try_start_bootstrap(driver, device)
 end
 
+local function apply_code_length_preference(device)
+  local desired = tonumber(device.preferences.codeLength)
+
+  if desired == nil or desired < 4 or desired > 8 then
+    return
+  end
+
+  local current = device:get_latest_state(
+    "main",
+    capabilities.lockCodes.ID,
+    capabilities.lockCodes.codeLength.NAME
+  )
+
+  if current == desired then
+    return
+  end
+
+  log.info(string.format(
+    "BP setting Schlage user-code length from %s to %d",
+    tostring(current),
+    desired
+  ))
+
+  device:send(Configuration:Set({
+    parameter_number = 16,
+    configuration_value = desired,
+    size = 1,
+  }))
+end
+
 local function info_changed(driver, device, event, args)
   call_parent_handler(driver.lifecycle_handlers.infoChanged, driver, device, event, args)
   mark_profile_ready_and_try_bootstrap(driver, device)
+
+  -- Do not add Configuration traffic while bootstrap or a code scan owns it.
+  if not device:get_field(BOOTSTRAP_REQUIRED)
+      and not device:get_field(CODE_SCAN_ACTIVE) then
+    apply_code_length_preference(device)
+  end
 end
 
 local function do_configure(driver, device)
