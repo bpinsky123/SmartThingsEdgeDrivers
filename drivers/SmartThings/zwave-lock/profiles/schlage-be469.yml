@@ -7,6 +7,10 @@ components:
     version: 1
   - id: lockCodes
     version: 1
+  - id: lockCredentials
+    version: 1
+  - id: lockUsers
+    version: 1
   - id: heartsample19211.lockActivity
     version: 1
   - id: tamperAlert
@@ -35,18 +39,18 @@ components:
   - id: heartsample19211.deviceNetworkId
     version: 1
 preferences:
-- title: Length of user code
+- title: "Query lock codes on refresh"
+  name: refreshCodes
+  description: "For legacy lock-code devices, retrieve all lock codes when refreshed."
+  required: true
+  preferenceType: boolean
+  definition:
+    default: true
+- title: "Length of user code"
   name: codeLength
-  description: User codes may be between 4 and 8 digits. Changing this setting erases all existing codes.
+  description: "User codes may be between 4 and 8 digits. Changing this setting erases all existing codes."
   required: false
   preferenceType: integer
   definition:
     minimum: 4
     maximum: 8
-- title: Refresh user codes
-  name: refreshCodes
-  description: Request every user-code slot when Refresh is pressed.
-  required: false
-  preferenceType: boolean
-  definition:
-    default: false
