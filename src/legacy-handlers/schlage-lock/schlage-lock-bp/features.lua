@@ -27,33 +27,52 @@ local params = {
   [15] = { cap = M.capabilities.auto_lock, attr = "autoLock", map = {[0] = "off", [-1] = "autolock"} },
 }
 
-local refresh_parameters = { 3, 4, 5, 7, 8, 9, 10, 11, 15 }
+-- Read the most user-visible setting first.  The queue remains response-paced,
+-- so this changes priority only; it does not add parallel radio traffic.
+local refresh_parameters = { 15, 11, 10, 9, 8, 7, 5, 4, 3 }
 local SETTINGS_REFRESH_QUEUE = "bp_settings_refresh_queue"
 local SETTINGS_REFRESH_IN_FLIGHT = "bp_settings_refresh_in_flight"
 local SETTINGS_REFRESH_DELAY = 0.5
-local SETTINGS_REFRESH_TIMEOUT = 10
+-- The timer starts when the command is queued, not when it reaches the lock.
+-- Initial Door Lock, Battery, and User Code traffic can consume over 10 s.
+local SETTINGS_REFRESH_TIMEOUT = 20
+local SETTINGS_REFRESH_CALLBACKS = {}
 
-local function request_next_setting(device)
+local request_next_setting
+
+local function run_settings_refresh_callbacks(device)
+  local callbacks = SETTINGS_REFRESH_CALLBACKS[device.id]
+  SETTINGS_REFRESH_CALLBACKS[device.id] = nil
+  for _, callback in ipairs(callbacks or {}) do
+    local ok, err = pcall(callback, device)
+    if not ok then
+      log.error("BP settings-refresh completion callback failed: " .. tostring(err))
+    end
+  end
+end
+
+local function finish_settings_refresh(device)
+  device:set_field(SETTINGS_REFRESH_QUEUE, nil)
+  device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
+  run_settings_refresh_callbacks(device)
+end
+
+request_next_setting = function(device)
   local queue = device:get_field(SETTINGS_REFRESH_QUEUE)
-
   if not queue or #queue == 0 then
-    device:set_field(SETTINGS_REFRESH_QUEUE, nil)
-    device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
+    finish_settings_refresh(device)
     return
   end
 
   local parameter = table.remove(queue, 1)
   device:set_field(SETTINGS_REFRESH_QUEUE, queue)
   device:set_field(SETTINGS_REFRESH_IN_FLIGHT, parameter)
-
   log.info(string.format("Requesting Schlage configuration parameter %d", parameter))
   device:send(Configuration:Get({ parameter_number = parameter }))
 
-  -- Continue if this particular parameter never reports.
   device.thread:call_with_delay(SETTINGS_REFRESH_TIMEOUT, function()
     if device:get_field(SETTINGS_REFRESH_IN_FLIGHT) == parameter then
-      log.warn(string.format(
-        "Timed out waiting for Schlage configuration parameter %d", parameter))
+      log.warn(string.format("Timed out waiting for Schlage configuration parameter %d", parameter))
       device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
       request_next_setting(device)
     end
@@ -61,10 +80,7 @@ local function request_next_setting(device)
 end
 
 local function advance_settings_refresh(device, parameter)
-  if device:get_field(SETTINGS_REFRESH_IN_FLIGHT) ~= parameter then
-    return
-  end
-
+  if device:get_field(SETTINGS_REFRESH_IN_FLIGHT) ~= parameter then return end
   device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
   device.thread:call_with_delay(SETTINGS_REFRESH_DELAY, function()
     request_next_setting(device)
@@ -87,33 +103,55 @@ function M.emit_device_network_id(device)
   end
 end
 
-function M.configuration_report(device, cmd)
-  local setting = params[cmd.args.parameter_number]
-  local value = setting and setting.map[cmd.args.configuration_value]
+local function emit_setting(device, parameter, value, force_state_change)
+  local setting = params[parameter]
   local component = setting and setting_component(device)
-  if value ~= nil and component and device:supports_capability_by_id(setting.cap.ID, component.id) then
-    device:emit_component_event(component, setting.cap[setting.attr](value))
+  if setting and value ~= nil and component
+      and device:supports_capability_by_id(setting.cap.ID, component.id) then
+    local event_options
+    if force_state_change then
+      -- Configuration GET reports can match the driver's local cached value
+      -- while cloud state is still absent or stale.  Mark queued reads as a
+      -- state change so the platform persists the report.
+      event_options = { state_change = true }
+    end
+    device:emit_component_event(component, setting.cap[setting.attr](value, event_options))
   end
-  advance_settings_refresh(device, cmd.args.parameter_number)
 end
 
-function M.refresh_settings(device)
-  if device:get_field(SETTINGS_REFRESH_QUEUE) ~= nil then
-    return false
+function M.configuration_report(device, cmd)
+  local parameter = cmd.args.parameter_number
+  local setting = params[parameter]
+  local value = setting and setting.map[cmd.args.configuration_value]
+  if value ~= nil then
+    -- Only reports that belong to the paced Configuration GET queue need a
+    -- forced state change.  Command-response reports retain normal behavior.
+    local queued_read = device:get_field(SETTINGS_REFRESH_IN_FLIGHT) == parameter
+    emit_setting(device, parameter, value, queued_read)
+  end
+  advance_settings_refresh(device, parameter)
+end
+
+function M.refresh_settings(device, on_complete)
+  if device:get_field(SETTINGS_REFRESH_QUEUE) ~= nil then return false end
+
+  if on_complete then
+    local callbacks = SETTINGS_REFRESH_CALLBACKS[device.id] or {}
+    table.insert(callbacks, on_complete)
+    SETTINGS_REFRESH_CALLBACKS[device.id] = callbacks
   end
 
   local queue = {}
-
   for _, parameter in ipairs(refresh_parameters) do
     local setting = params[parameter]
     local component = setting_component(device)
-
     if component and device:supports_capability_by_id(setting.cap.ID, component.id) then
       table.insert(queue, parameter)
     end
   end
 
   if #queue == 0 then
+    finish_settings_refresh(device)
     return false
   end
 
@@ -124,10 +162,8 @@ end
 
 local command_params = {
   ["heartsample19211.schlageLockAlarm"] = {
-    off = { parameter = 7, value = 0 },
-    activity = { parameter = 7, value = 1 },
-    tamper = { parameter = 7, value = 2 },
-    forcedentry = { parameter = 7, value = 3 },
+    off = { parameter = 7, value = 0 }, activity = { parameter = 7, value = 1 },
+    tamper = { parameter = 7, value = 2 }, forcedentry = { parameter = 7, value = 3 },
     setAlarmMode = { parameter = 7, argument = "mode", values = {off = 0, activity = 1, tamper = 2, forcedentry = 3} },
     setActivitySensitivity = { parameter = 8, argument = "sensitivity" },
     setTamperSensitivity = { parameter = 9, argument = "sensitivity" },
@@ -158,8 +194,8 @@ function M.emit_activity(device, activity, message, user_name, user_index)
   if not device:supports_capability(cap) then return end
   device:emit_event(cap.activity(activity))
   device:emit_event(cap.message(message))
-  device:emit_event(cap.userName(user_name or ""))
-  device:emit_event(cap.userIndex(user_index or 0))
+  device:emit_event(cap.userName(user_name or "", { visibility = { displayed = false } }))
+  device:emit_event(cap.userIndex(user_index or 0, { visibility = { displayed = false } }))
 end
 
 function M.activity_from_notification(device, cmd, user_lookup)
@@ -178,14 +214,13 @@ function M.activity_from_notification(device, cmd, user_lookup)
   }
   local detail = activity_map[event]
   if not detail then return end
+
   if event == access.KEYPAD_LOCK_OPERATION or event == access.KEYPAD_UNLOCK_OPERATION then
     local parameter = cmd.args.event_parameter
     local code_id = tonumber(cmd.args.v1_alarm_level)
-    -- A zero alarm level without an event parameter is not a reported user slot.
-    -- Do not mislabel an unattributed keypad operation as the Master Code.
     local explicit_code_id = code_id ~= nil and code_id ~= 0
     if parameter and #parameter > 0 then
-      local bytes = {parameter:byte(1, -1)}
+      local bytes = { parameter:byte(1, -1) }
       code_id = #bytes == 1 and bytes[1] or bytes[3]
       explicit_code_id = true
     end
@@ -193,6 +228,10 @@ function M.activity_from_notification(device, cmd, user_lookup)
     local user_name, user_index
     if explicit_code_id then
       user_name, user_index = user_lookup(code_id)
+      user_index = user_index or code_id
+      if not user_name or user_name == "" then
+        user_name = code_id == 0 and "Master Code" or string.format("Code %d", code_id)
+      end
     end
 
     local message = detail[2]
