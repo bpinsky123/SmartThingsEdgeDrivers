@@ -19,7 +19,30 @@ local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
 
+local bp_migration_test = capabilities["heartsample19211.bpMigrationTest"]
+
 local LockLifecycle = {}
+
+local function emit_bp_migration_state(device, migrated)
+  if device:supports_capability(bp_migration_test) then
+    device:emit_event(bp_migration_test.mode(
+      migrated and "migrated" or "legacy",
+      { visibility = { displayed = false } }
+    ))
+  end
+
+  if device:supports_capability(capabilities.lockCodes) then
+    device:emit_event(capabilities.lockCodes.migrated(
+      migrated,
+      { visibility = { displayed = false } }
+    ))
+  end
+end
+
+local function set_bp_migration_state(driver, device, migrated)
+  device:set_field(consts.DRIVER_STATE.SLGA_MIGRATED, migrated, { persist = true })
+  emit_bp_migration_state(device, migrated)
+end
 
 function LockLifecycle.device_added(driver, device)
   if device:supports_capability(capabilities.tamperAlert) then
@@ -34,6 +57,10 @@ function LockLifecycle.device_added(driver, device)
 end
 
 function LockLifecycle.init(driver, device)
+ emit_bp_migration_state(
+    device,
+    device:get_field(consts.DRIVER_STATE.SLGA_MIGRATED) == true
+  )
   -- Restore users/credentials capability state from the persistent store in case
   -- the capability state cache was wiped since the last driver run.
   table_utils.restore_from_persistent_store(device)
@@ -60,6 +87,14 @@ end
 
 local function refresh(driver, device, command)
   capability_handlers.refresh(driver, device, command)
+end
+
+local function test_migrate(driver, device, command)
+  set_bp_migration_state(driver, device, true)
+end
+
+local function test_revert(driver, device, command)
+  set_bp_migration_state(driver, device, false)
 end
 
 local driver_template = {
@@ -101,6 +136,10 @@ local driver_template = {
     [capabilities.refresh.ID] = {
       [capabilities.refresh.commands.refresh.NAME] = refresh,
     },
+    [bp_migration_test.ID] = {
+      [bp_migration_test.commands.migrate.NAME] = test_migrate,
+      [bp_migration_test.commands.revert.NAME] = test_revert,
+    },
   },
   supported_capabilities = {
     capabilities.lock,
@@ -109,6 +148,7 @@ local driver_template = {
     capabilities.lockCredentials,
     capabilities.battery,
     capabilities.tamperAlert,
+    bp_migration_test,
   },
   sub_drivers = require("sub_drivers"),
   shared_device_thread_enabled = true,
