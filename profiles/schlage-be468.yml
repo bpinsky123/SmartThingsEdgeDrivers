@@ -19,6 +19,8 @@ components:
     version: 1
   - id: refresh
     version: 1
+  - id: heartsample19211.bpMigrationTest
+    version: 1
   categories:
   - name: SmartLock
 - id: settings

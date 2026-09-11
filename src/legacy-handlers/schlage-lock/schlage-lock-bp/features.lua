@@ -4,6 +4,11 @@ local Notification = (require "st.zwave.CommandClass.Notification")({ version = 
 local log = require "log"
 local M = {}
 
+local AUTO_LOCK_PARAMETER = 15
+local AUTO_LOCK_REPORT_PENDING = "bp_auto_lock_report_pending"
+local AUTO_LOCK_REPORT_GENERATION = "bp_auto_lock_report_generation"
+local AUTO_LOCK_REPORT_DELAY = 3
+
 M.capabilities = {
   alarm = capabilities["heartsample19211.schlageLockAlarm"],
   auto_lock = capabilities["heartsample19211.autoLock"],
@@ -121,11 +126,19 @@ end
 
 function M.configuration_report(device, cmd)
   local parameter = cmd.args.parameter_number
+
+  -- A matching report confirms the Auto Lock SET succeeded and suppresses
+  -- the delayed recovery GET.
+  if parameter == AUTO_LOCK_PARAMETER then
+    local pending = device:get_field(AUTO_LOCK_REPORT_PENDING)
+    if pending and pending.value == cmd.args.configuration_value then
+      device:set_field(AUTO_LOCK_REPORT_PENDING, nil)
+    end
+  end
+
   local setting = params[parameter]
   local value = setting and setting.map[cmd.args.configuration_value]
   if value ~= nil then
-    -- Only reports that belong to the paced Configuration GET queue need a
-    -- forced state change.  Command-response reports retain normal behavior.
     local queued_read = device:get_field(SETTINGS_REFRESH_IN_FLIGHT) == parameter
     emit_setting(device, parameter, value, queued_read)
   end
@@ -178,15 +191,59 @@ local command_params = {
 
 M.command_params = command_params
 
+local function watch_for_auto_lock_report(device, value)
+  local generation = (device:get_field(AUTO_LOCK_REPORT_GENERATION) or 0) + 1
+  local pending = {
+    generation = generation,
+    value = value,
+  }
+
+  device:set_field(AUTO_LOCK_REPORT_GENERATION, generation)
+  device:set_field(AUTO_LOCK_REPORT_PENDING, pending)
+
+  device.thread:call_with_delay(AUTO_LOCK_REPORT_DELAY, function()
+    local current = device:get_field(AUTO_LOCK_REPORT_PENDING)
+
+    if current and current.generation == generation then
+      device:set_field(AUTO_LOCK_REPORT_PENDING, nil)
+      log.warn("No auto-lock Configuration Report after SET; querying parameter 15")
+      device:send(Configuration:Get({
+        parameter_number = AUTO_LOCK_PARAMETER,
+      }))
+    end
+  end)
+end
+
 function M.setting_command(_, device, cmd)
   local spec = command_params[cmd.capability] and command_params[cmd.capability][cmd.command]
   if not spec then
     log.warn(string.format("No Schlage setting mapping for %s.%s", cmd.capability, cmd.command))
     return
   end
-  local value = spec.value or (spec.values and spec.values[cmd.args[spec.argument]]) or cmd.args[spec.argument]
-  log.info(string.format("Setting Schlage configuration parameter %d to %s", spec.parameter, tostring(value)))
-  device:send(Configuration:Set({ parameter_number = spec.parameter, configuration_value = value, size = 1 }))
+
+  local value = spec.value or
+    (spec.values and spec.values[cmd.args[spec.argument]]) or
+    cmd.args[spec.argument]
+
+  log.info(string.format(
+    "Setting Schlage configuration parameter %d to %s",
+    spec.parameter,
+    tostring(value)
+  ))
+
+  -- Normal operation: every firmware needs this SET.
+  device:send(Configuration:Set({
+    parameter_number = spec.parameter,
+    configuration_value = value,
+    size = 1,
+  }))
+
+  -- Most locks report parameter 15 after SET.  If one does not, query it
+  -- once after a short grace period so the normal report handler updates
+  -- the mobile-app state.
+  if spec.parameter == AUTO_LOCK_PARAMETER then
+    watch_for_auto_lock_report(device, value)
+  end
 end
 
 function M.emit_activity(device, activity, message, user_name, user_index)
