@@ -1,0 +1,34 @@
+{
+  "name": "BP Migration Test",
+  "attributes": {
+    "mode": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": ["legacy", "migrated"]
+          }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      },
+      "enumCommands": [
+        { "command": "migrate", "value": "migrated" },
+        { "command": "revert", "value": "legacy" }
+      ]
+    }
+  },
+  "commands": {
+    "migrate": {
+      "name": "migrate",
+      "arguments": [],
+      "sensitive": false
+    },
+    "revert": {
+      "name": "revert",
+      "arguments": [],
+      "sensitive": false
+    }
+  }
+}
