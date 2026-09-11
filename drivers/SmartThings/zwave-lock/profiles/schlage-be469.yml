@@ -1,4 +1,4 @@
-name: bp-schlage-be469-legacy
+name: bp-schlage-be469
 components:
 - id: main
   label: Main
