@@ -20,8 +20,79 @@ local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
 
 local bp_migration_test = capabilities["heartsample19211.bpMigrationTest"]
+local json = require "dkjson"
 
 local LockLifecycle = {}
+
+local function copy_legacy_codes_to_migrated_tables(device)
+  local encoded = device:get_latest_state(
+    "main",
+    capabilities.lockCodes.ID,
+    capabilities.lockCodes.lockCodes.NAME
+  )
+
+  local lock_codes
+  if type(encoded) == "table" then
+    lock_codes = encoded
+  elseif type(encoded) == "string" and encoded ~= "" then
+    local ok, decoded = pcall(json.decode, encoded)
+    if ok and type(decoded) == "table" then
+      lock_codes = decoded
+    end
+  end
+
+  if type(lock_codes) ~= "table" then
+    device.log.warn("BP migration test: no legacy lockCodes data to copy")
+    return false
+  end
+
+  local slots = {}
+  for raw_slot, name in pairs(lock_codes) do
+    local slot = tonumber(raw_slot)
+    if slot and slot > 0 and slot == math.floor(slot) and
+        type(name) == "string" and name ~= "" then
+      table.insert(slots, { slot = slot, name = name })
+    end
+  end
+
+  table.sort(slots, function(a, b) return a.slot < b.slot end)
+
+  for _, item in ipairs(slots) do
+    local user = table_utils.find_entry(device, "users", item.slot)
+    if user then
+      table_utils.update_entry(device, "users", item.slot, {
+        userName = item.name,
+      })
+    else
+      table_utils.add_entry(device, "users", {
+        userIndex = item.slot,
+        userName = item.name,
+        userType = "adminMember",
+      })
+    end
+
+    local credential = table_utils.find_entry(device, "credentials", item.slot)
+    if credential then
+      table_utils.update_entry(device, "credentials", item.slot, {
+        credentialName = item.name,
+        credentialType = "pin",
+        userIndex = item.slot,
+      })
+    else
+      table_utils.add_entry(device, "credentials", {
+        credentialIndex = item.slot,
+        credentialName = item.name,
+        credentialType = "pin",
+        userIndex = item.slot,
+      })
+    end
+  end
+
+  device.log.info(string.format(
+    "BP migration test: copied %d legacy lock-code entries", #slots
+  ))
+  return true
+end
 
 local function emit_bp_migration_state(device, migrated)
   if device:supports_capability(bp_migration_test) then
@@ -40,8 +111,13 @@ local function emit_bp_migration_state(device, migrated)
 end
 
 local function set_bp_migration_state(driver, device, migrated)
+  if migrated and not copy_legacy_codes_to_migrated_tables(device) then
+    return false
+  end
+
   device:set_field(consts.DRIVER_STATE.SLGA_MIGRATED, migrated, { persist = true })
   emit_bp_migration_state(device, migrated)
+  return true
 end
 
 function LockLifecycle.device_added(driver, device)
