@@ -249,7 +249,7 @@ end
 function M.emit_activity(device, activity, message, user_name, user_index)
   local cap = M.capabilities.activity
   if not device:supports_capability(cap) then return end
-  device:emit_event(cap.activity(activity))
+  device:emit_event(cap.activity(activity, { visibility = { displayed = false } }))
   device:emit_event(cap.message(message))
   device:emit_event(cap.userName(user_name or "", { visibility = { displayed = false } }))
   device:emit_event(cap.userIndex(user_index or 0, { visibility = { displayed = false } }))

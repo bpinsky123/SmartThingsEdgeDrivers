@@ -348,14 +348,35 @@ local function legacy_user_lookup(device, code_id)
   end
 
   local lock_codes = device:get_field(constants.LOCK_CODES)
-  local name
+  local field_name
 
   if type(lock_codes) == "table" then
-    name = lock_codes[tostring(slot)] or lock_codes[slot]
+    field_name = lock_codes[tostring(slot)] or lock_codes[slot]
   end
 
+  local helper_name = LockCodesDefaults.get_code_name(device, slot)
+
+  local encoded = device:get_latest_state(
+    "main",
+    capabilities.lockCodes.ID,
+    capabilities.lockCodes.lockCodes.NAME
+  )
+
+  local state_name
+  if type(encoded) == "string" and encoded ~= "" then
+    local ok, decoded = pcall(json.decode, encoded)
+    if ok and type(decoded) == "table" then
+      state_name = decoded[tostring(slot)] or decoded[slot]
+    end
+  end
+
+  -- The lockCodes attribute reflects user renames, so prefer it.
+  local name = state_name
   if name == nil or name == "" then
-    name = LockCodesDefaults.get_code_name(device, slot)
+    name = field_name
+  end
+  if name == nil or name == "" then
+    name = helper_name
   end
 
   if (name == nil or name == "") and slot == 0 then
@@ -370,7 +391,9 @@ local function notification_report(driver, device, cmd)
     and driver.zwave_handlers[cc.NOTIFICATION][Notification.REPORT]
 
   call_parent_handler(parent_handlers, driver, device, cmd)
-  features.activity_from_notification(device, cmd, legacy_user_lookup)
+  features.activity_from_notification(device, cmd, function(code_id)
+    return legacy_user_lookup(device, code_id)
+  end)
 end
 
 local function battery_report(driver, device, cmd)
