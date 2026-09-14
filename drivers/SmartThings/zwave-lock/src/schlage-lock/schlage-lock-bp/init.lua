@@ -81,7 +81,9 @@ local function refresh_handler(driver, device, command)
   -- response-paced settings queue before reading migrated credentials.
   stock_capability_handlers.refresh(driver, device, command)
   features.refresh_settings(device, function(refreshed_device)
-    lock_utils.sync_device_state(refreshed_device)
+    if refreshed_device.preferences.refreshCodes then
+      lock_utils.sync_device_state(refreshed_device)
+    end
   end)
 end
 
