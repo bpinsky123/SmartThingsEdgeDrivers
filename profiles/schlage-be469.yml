@@ -43,7 +43,7 @@ components:
 preferences:
 - title: "Query lock codes on refresh"
   name: refreshCodes
-  description: "For legacy lock-code devices, retrieve all lock codes when refreshed."
+  description: "Retrieve user access information from the lock when refreshed. This may take a while."
   required: true
   preferenceType: boolean
   definition:
