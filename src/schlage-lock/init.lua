@@ -4,6 +4,7 @@
 local capabilities = require "st.capabilities"
 local cc = require "st.zwave.CommandClass"
 local constants = require "st.zwave.constants"
+local consts = require "lock_utils.constants"
 
 local UserCode = (require "st.zwave.CommandClass.UserCode")({version=1})
 local user_id_status = UserCode.user_id_status
@@ -58,12 +59,20 @@ local function is_user_code_report_mfr_specific(device, cmd)
 end
 
 local function user_code_report_handler(self, device, cmd)
+  -- A migrated credential scan must process every slot report, including
+  -- Schlage's masked occupied-code reports, so it can advance the scan.
+  if device:get_field(consts.DRIVER_STATE.COMMAND_IN_PROGRESS)
+      == consts.SYNC.CODES_FROM_LOCK then
+    zwave_handlers.user_code_report(self, device, cmd)
+    return
+  end
+
   local credential_index = cmd.args.user_identifier
   if is_user_code_report_mfr_specific(device, cmd) then
     local reported_user_id_status = cmd.args.user_id_status
 
-    if credential_index == 0 and reported_user_id_status == user_id_status.AVAILABLE then
-      -- master code changed, clear all credentials
+    if credential_index == 0
+        and reported_user_id_status == user_id_status.AVAILABLE then
       tables.delete_all_entries(device, "credentials")
       tables.delete_all_entries(device, "users")
     end
