@@ -3,22 +3,37 @@
 
 local capabilities = require "st.capabilities"
 local constants = require "lock_utils.constants"
+local log = require "log"
 
-local function is_slga_migrated(device)
-  return device:get_field(constants.DRIVER_STATE.SLGA_MIGRATED) == true
-    or device:get_latest_state(
-      "main",
-      capabilities.lockCodes.ID,
-      capabilities.lockCodes.migrated.NAME
-    ) == true
+local function migration_state(device)
+  local persisted = device:get_field(constants.DRIVER_STATE.SLGA_MIGRATED)
+  local cloud = device:get_latest_state(
+    "main",
+    capabilities.lockCodes.ID,
+    capabilities.lockCodes.migrated.NAME
+  )
+  return persisted, cloud
 end
 
 return function(opts, driver, device, cmd)
-  if is_slga_migrated(device) then
+  local persisted_migrated, cloud_migrated = migration_state(device)
+  local migrated = persisted_migrated == true or cloud_migrated == true
+  local manufacturer = device.zwave_manufacturer_id
+  local is_schlage = manufacturer == 0x003B
+
+  log.info(string.format(
+    "BP diagnostic legacy Schlage selector: manufacturer=%s persistent_migrated=%s cloud_migrated=%s accepted=%s",
+    manufacturer and string.format("0x%04X", manufacturer) or "nil",
+    tostring(persisted_migrated),
+    tostring(cloud_migrated),
+    tostring(not migrated and is_schlage)
+  ))
+
+  if migrated then
     return false
   end
 
-  if device.zwave_manufacturer_id == 0x003B then
+  if is_schlage then
     return true, require "legacy-handlers.schlage-lock"
   end
   return false
