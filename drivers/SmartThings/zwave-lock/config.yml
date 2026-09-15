@@ -1,4 +1,4 @@
-name: 'Z-Wave Lock BP'
+name: 'Z-Wave Lock BP Migration Test'
 packageKey: 'zwave-lock-bp'
 permissions:
   zwave: {}
