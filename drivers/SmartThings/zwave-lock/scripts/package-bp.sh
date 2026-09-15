@@ -42,5 +42,8 @@ if [ "$variant" = beta ]; then
   done
 fi
 
-smartthings edge:drivers:package "$stage_dir" --build-only "$output"
+(
+  cd "$stage_dir"
+  smartthings edge:drivers:package --build-only "$output"
+)
 printf 'Wrote %s\n' "$output"
