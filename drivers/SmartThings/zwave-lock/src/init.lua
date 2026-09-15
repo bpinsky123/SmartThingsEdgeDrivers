@@ -19,7 +19,7 @@ local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
 
-local bp_migration_test = capabilities["heartsample19211.bpMigrationTest"]
+local BP_MIGRATION_TEST_ID = "heartsample19211.bpMigrationTest"
 local json = require "dkjson"
 
 local LockLifecycle = {}
@@ -95,7 +95,8 @@ local function copy_legacy_codes_to_migrated_tables(device)
 end
 
 local function emit_bp_migration_state(device, migrated)
-  if device:supports_capability(bp_migration_test) then
+  if device:supports_capability_by_id(BP_MIGRATION_TEST_ID, "main") then
+    local bp_migration_test = capabilities[BP_MIGRATION_TEST_ID]
     device:emit_event(bp_migration_test.mode(
       migrated and "migrated" or "legacy",
       { visibility = { displayed = false } }
@@ -212,9 +213,9 @@ local driver_template = {
     [capabilities.refresh.ID] = {
       [capabilities.refresh.commands.refresh.NAME] = refresh,
     },
-    [bp_migration_test.ID] = {
-      [bp_migration_test.commands.migrate.NAME] = test_migrate,
-      [bp_migration_test.commands.revert.NAME] = test_revert,
+    [BP_MIGRATION_TEST_ID] = {
+      migrate = test_migrate,
+      revert = test_revert,
     },
   },
   supported_capabilities = {
@@ -224,7 +225,6 @@ local driver_template = {
     capabilities.lockCredentials,
     capabilities.battery,
     capabilities.tamperAlert,
-    bp_migration_test,
   },
   sub_drivers = require("sub_drivers"),
   shared_device_thread_enabled = true,
