@@ -53,9 +53,7 @@ local function matching_fingerprint(device)
   end
 end
 
-local function can_handle(_, _, device)
-  return matching_fingerprint(device) ~= nil
-end
+local can_handle = require "legacy-handlers.schlage-lock.schlage-lock-bp.can_handle"
 
 local function capability_handlers()
   local handlers = {}
