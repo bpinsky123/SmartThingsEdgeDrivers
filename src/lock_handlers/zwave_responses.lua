@@ -11,6 +11,7 @@ local Notification = (require "st.zwave.CommandClass.Notification")({version=3})
 --- @type st.zwave.CommandClass.UserCode
 local UserCode = (require "st.zwave.CommandClass.UserCode")({version=1})
 local TamperDefaults = require "st.zwave.defaults.tamperAlert"
+local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
 
 local consts     = require "lock_utils.constants"
 local lock_utils = require "lock_utils.utils"
@@ -138,26 +139,28 @@ function ZwaveHandlers.door_operation_event_handler(driver, device, cmd)
   if cmd.args.notification_type ~= Notification.notification_type.ACCESS_CONTROL then
     return
   end
-  -- zw event value
+
   local event = cmd.args.event
-  -- This type includes many lock-related events, way too many to list,
-  -- including user code changes and door operations
   local access_control_event = Notification.event.access_control
-  -- send lock, unlock, or unknown event based on the event coded
   local capability_event
-  if not (event >= access_control_event.MANUAL_LOCK_OPERATION and event <= access_control_event.LOCK_JAMMED) then
-    return -- This is the subset of event kinds that we care about for door operation reporting
-  elseif ((event >= access_control_event.MANUAL_LOCK_OPERATION and
-        event <= access_control_event.KEYPAD_UNLOCK_OPERATION) or
-        event == access_control_event.AUTO_LOCK_LOCKED_OPERATION) then
-    -- even event codes are unlocks, odd event codes are locks
-    local events = {[0] = capabilities.lock.lock.unlocked(), [1] = capabilities.lock.lock.locked()}
+
+  if not (event >= access_control_event.MANUAL_LOCK_OPERATION
+      and event <= access_control_event.LOCK_JAMMED) then
+    return
+  elseif (event >= access_control_event.MANUAL_LOCK_OPERATION
+      and event <= access_control_event.KEYPAD_UNLOCK_OPERATION)
+      or event == access_control_event.AUTO_LOCK_LOCKED_OPERATION then
+    -- Even event codes are unlocks; odd event codes are locks.
+    local events = {
+      [0] = capabilities.lock.lock.unlocked(),
+      [1] = capabilities.lock.lock.locked(),
+    }
     capability_event = events[event & 1]
-  elseif (event >= access_control_event.MANUAL_NOT_FULLY_LOCKED_OPERATION and
-          event <= access_control_event.LOCK_JAMMED) then
+  elseif event >= access_control_event.MANUAL_NOT_FULLY_LOCKED_OPERATION
+      and event <= access_control_event.LOCK_JAMMED then
     capability_event = capabilities.lock.lock.unknown()
   else
-    return -- no lock event to send for this code
+    return
   end
 
   local access_control_event_capability_map = {
@@ -170,22 +173,52 @@ function ZwaveHandlers.door_operation_event_handler(driver, device, cmd)
     [access_control_event.KEYPAD_LOCK_OPERATION] = "keypad",
     [access_control_event.KEYPAD_UNLOCK_OPERATION] = "keypad",
     [access_control_event.AUTO_LOCK_LOCKED_OPERATION] = "auto",
-    [access_control_event.AUTO_LOCK_NOT_FULLY_LOCKED_OPERATION] = "auto"
+    [access_control_event.AUTO_LOCK_NOT_FULLY_LOCKED_OPERATION] = "auto",
   }
 
-  capability_event.data = {}
-  capability_event.data.method = access_control_event_capability_map[event]
+  capability_event.data = {
+    method = access_control_event_capability_map[event],
+  }
 
-  if (event == access_control_event.MANUAL_UNLOCK_OPERATION and cmd.args.event_parameter == 2) then
-    capability_event.data.method = "keypad" -- some locks can distinguish being manually locked via keypad
-  elseif (event == access_control_event.KEYPAD_LOCK_OPERATION or event == access_control_event.KEYPAD_UNLOCK_OPERATION) then
+  if event == access_control_event.MANUAL_UNLOCK_OPERATION
+      and cmd.args.event_parameter == 2 then
+    -- Some locks can distinguish being manually unlocked via keypad.
+    capability_event.data.method = "keypad"
+
+  elseif event == access_control_event.KEYPAD_LOCK_OPERATION
+      or event == access_control_event.KEYPAD_UNLOCK_OPERATION then
     local code_id = tonumber(lock_utils.get_code_id_from_notification_event(
-      cmd.args.event_parameter, cmd.args.v1_alarm_level))    -- Look up stored lockUsers data if applicable
+      cmd.args.event_parameter,
+      cmd.args.v1_alarm_level
+    ))
+
+    -- Retain PH/SLGA-compatible code metadata on the standard lock event.
+    if code_id ~= nil and device:supports_capability(capabilities.lockCodes) then
+      local code_name
+
+      if code_id == 0 then
+        code_name = "Master Code"
+      else
+        code_name = LockCodesDefaults.get_code_name(device, code_id)
+        if code_name == nil or code_name == "" then
+          code_name = string.format("Code %d", code_id)
+        end
+      end
+
+      capability_event.data.codeId = tostring(code_id)
+      capability_event.data.codeName = code_name
+    end
+
+    capability_event.visibility = { displayed = false }
+
+    -- Retain the new user metadata for migrated locks and Routines.
     if device:supports_capability(capabilities.lockUsers) then
       local credential = tables.find_entry(device, "credentials", code_id)
+
       if credential then
         local user = tables.find_entry(device, "users", credential.userIndex)
         capability_event.data.userIndex = credential.userIndex
+
         if user then
           capability_event.data.userName = user.userName
           capability_event.data.userType = user.userType
@@ -196,13 +229,15 @@ function ZwaveHandlers.door_operation_event_handler(driver, device, cmd)
     end
   end
 
-  -- Delay timer logic to handle duplicate lock state reports
+  -- Delay timer logic to handle duplicate lock state reports.
   if device:get_latest_state(
     "main",
     capabilities.lock.ID,
-    capabilities.lock.lock.ID) == capability_event.value.value then
+    capabilities.lock.lock.ID
+  ) == capability_event.value.value then
     local preceding_event_time = device:get_field(consts.DELAY_LOCK_EVENT) or 0
     local time_diff = socket.gettime() - preceding_event_time
+
     if time_diff < consts.MAX_DELAY then
       device:set_field(consts.DELAY_LOCK_EVENT, time_diff)
     end
@@ -220,21 +255,19 @@ end
 function ZwaveHandlers.notification_report(driver, device, cmd)
   ZwaveHandlers.user_code_event_handler(driver, device, cmd)
   ZwaveHandlers.door_operation_event_handler(driver, device, cmd)
-  -- Tamper events handled by default tamper handler
+  -- Tamper events handled by default tamper handler.
   TamperDefaults.zwave_handlers[cc.NOTIFICATION][Notification.REPORT](driver, device, cmd)
 end
-
-
--- [[ TIME COMMAND CLASS ]] --
 
 function ZwaveHandlers.time_get_handler(driver, device, cmd)
   local Time = (require "st.zwave.CommandClass.Time")({ version = 1 })
   local time = os.date("*t")
+
   device:send_to_component(
     Time:Report({
       hour_local_time = time.hour,
       minute_local_time = time.min,
-      second_local_time = time.sec
+      second_local_time = time.sec,
     }),
     device:endpoint_to_component(cmd.src_channel)
   )
