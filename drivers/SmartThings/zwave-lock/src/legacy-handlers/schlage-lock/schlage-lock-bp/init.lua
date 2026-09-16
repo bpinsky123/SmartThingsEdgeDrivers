@@ -34,6 +34,124 @@ local CODE_SCAN_POLL_SECONDS = 1
 local CODE_SCAN_POLL_MAX_ATTEMPTS = 90
 local CODE_NAME_SNAPSHOT = "bp_legacy_code_name_snapshot"
 
+-- BP owns scan sequencing so it can safely exceed the framework's
+-- eight-slot legacy lockCodes limit without modifying shared constants.
+local BP_CODE_SCAN_ACTIVE = "bp_legacy_code_scan_active"
+local BP_CODE_SCAN_WAITING = "bp_legacy_code_scan_waiting"
+local BP_CODE_SCAN_INDEX = "bp_legacy_code_scan_index"
+local BP_CODE_SCAN_MAX = "bp_legacy_code_scan_max"
+local BP_CODE_SCAN_EMPTY_COUNT = "bp_legacy_code_scan_empty_count"
+local BP_MAX_CONSECUTIVE_EMPTY_SLOTS = 6
+local BP_MAX_CODE_SCAN_SLOTS = 30
+
+local function bp_finish_code_scan(device)
+  device:emit_event(capabilities.lockCodes.scanCodes(
+    "Complete",
+    { visibility = { displayed = false } }
+  ))
+
+  device:set_field(BP_CODE_SCAN_ACTIVE, nil)
+  device:set_field(BP_CODE_SCAN_WAITING, nil)
+  device:set_field(BP_CODE_SCAN_INDEX, nil)
+  device:set_field(BP_CODE_SCAN_MAX, nil)
+  device:set_field(BP_CODE_SCAN_EMPTY_COUNT, nil)
+  device:set_field(constants.CHECKING_CODE, nil)
+end
+
+local function bp_request_code_slot(device, slot)
+  device:set_field(BP_CODE_SCAN_INDEX, slot)
+  device:send(UserCode:Get({ user_identifier = slot }))
+end
+
+local function bp_start_code_scan(device, reported_max_codes)
+  local max_codes = tonumber(reported_max_codes)
+
+  if max_codes == nil then
+    device:set_field(BP_CODE_SCAN_WAITING, true)
+    device:send(UserCode:UsersNumberGet({}))
+    return
+  end
+
+  max_codes = math.min(max_codes, BP_MAX_CODE_SCAN_SLOTS)
+  if max_codes < 1 then
+    bp_finish_code_scan(device)
+    return
+  end
+
+  -- The stock UserCode report handler uses this field for its own
+  -- fixed-eight-slot scanner. BP keeps its index in separate state.
+  device:set_field(constants.CHECKING_CODE, nil)
+  device:set_field(BP_CODE_SCAN_WAITING, nil)
+  device:set_field(BP_CODE_SCAN_ACTIVE, true)
+  device:set_field(BP_CODE_SCAN_MAX, max_codes)
+  device:set_field(BP_CODE_SCAN_EMPTY_COUNT, 0)
+
+  device:emit_event(capabilities.lockCodes.scanCodes(
+    "Scanning",
+    { visibility = { displayed = false } }
+  ))
+
+  bp_request_code_slot(device, 1)
+end
+
+local function bp_slot_is_occupied(cmd)
+  local status = cmd.args.user_id_status
+
+  return status == UserCode.user_id_status.ENABLED_GRANT_ACCESS
+    or (
+      status == UserCode.user_id_status.STATUS_NOT_AVAILABLE
+      and cmd.args.user_code ~= nil
+    )
+end
+
+local function bp_user_code_report(driver, device, cmd)
+  -- Reuse stock state/name/event processing. BP supplies only the scan
+  -- continuation rule after the stock handler returns.
+  local stock_handler = LockCodesDefaults.zwave_handlers[cc.USER_CODE]
+    and LockCodesDefaults.zwave_handlers[cc.USER_CODE][UserCode.REPORT]
+
+  if stock_handler then
+    stock_handler(driver, device, cmd)
+  end
+
+  if not device:get_field(BP_CODE_SCAN_ACTIVE) then
+    return
+  end
+
+  local expected_slot = device:get_field(BP_CODE_SCAN_INDEX)
+  local reported_slot = tonumber(cmd.args.user_identifier)
+  if reported_slot == nil or reported_slot ~= expected_slot then
+    return
+  end
+
+  local empty_count = device:get_field(BP_CODE_SCAN_EMPTY_COUNT) or 0
+  if bp_slot_is_occupied(cmd) then
+    empty_count = 0
+  else
+    empty_count = empty_count + 1
+  end
+  device:set_field(BP_CODE_SCAN_EMPTY_COUNT, empty_count)
+
+  local max_slot = device:get_field(BP_CODE_SCAN_MAX) or reported_slot
+  if reported_slot >= max_slot
+      or empty_count >= BP_MAX_CONSECUTIVE_EMPTY_SLOTS then
+    bp_finish_code_scan(device)
+    return
+  end
+
+  bp_request_code_slot(device, reported_slot + 1)
+end
+
+local function bp_reload_all_codes(_, device, _)
+  local max_codes = device:get_latest_state(
+    "main",
+    capabilities.lockCodes.ID,
+    capabilities.lockCodes.maxCodes.NAME
+  )
+
+  bp_start_code_scan(device, max_codes)
+end
+
 local PROFILE_READY_RETRY_COUNT = "bp_profile_ready_retry_count"
 local PROFILE_READY_RETRY_SECONDS = 1
 local PROFILE_READY_MAX_RETRIES = 12
@@ -421,6 +539,12 @@ local function users_number_report(driver, device, cmd)
     legacy_handler(driver, device, cmd)
   end
 
+  -- A direct reload can arrive before maxCodes exists in local state.
+  if device:get_field(BP_CODE_SCAN_WAITING) then
+    bp_start_code_scan(device, cmd.args.supported_users)
+    return
+  end
+
   local initializing = device:get_field(CODE_INIT_PENDING)
   local refreshing = device:get_field(CODE_REFRESH_PENDING)
 
@@ -440,11 +564,7 @@ local function users_number_report(driver, device, cmd)
     snapshot_code_names(device)
   end
 
-  driver:inject_capability_command(device, {
-    capability = capabilities.lockCodes.ID,
-    command = capabilities.lockCodes.commands.reloadAllCodes.NAME,
-    args = {},
-  })
+  bp_start_code_scan(device, cmd.args.supported_users)
 
   if device:get_field(SETTINGS_AFTER_CODE_SCAN) then
     device.thread:call_with_delay(CODE_SCAN_POLL_SECONDS, function()
@@ -605,6 +725,10 @@ return {
       [capabilities.refresh.commands.refresh.NAME] = refresh_handler,
     }
 
+    handlers[capabilities.lockCodes.ID] = {
+      [capabilities.lockCodes.commands.reloadAllCodes.NAME] = bp_reload_all_codes,
+    }
+
     return handlers
   end)(),
 
@@ -619,6 +743,7 @@ return {
       [Notification.REPORT] = notification_report,
     },
     [cc.USER_CODE] = {
+      [UserCode.REPORT] = bp_user_code_report,
       [UserCode.USERS_NUMBER_REPORT] = users_number_report,
     },
   },
