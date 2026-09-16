@@ -256,7 +256,10 @@ function M.emit_activity(device, activity, message, user_name, user_index)
 end
 
 function M.activity_from_notification(device, cmd, user_lookup)
-  if cmd.args.notification_type ~= Notification.notification_type.ACCESS_CONTROL then return end
+  if cmd.args.notification_type ~= Notification.notification_type.ACCESS_CONTROL then
+    return
+  end
+
   local event = cmd.args.event
   local access = Notification.event.access_control
   local activity_map = {
@@ -269,16 +272,25 @@ function M.activity_from_notification(device, cmd, user_lookup)
     [access.AUTO_LOCK_LOCKED_OPERATION] = { "autoLocked", "Auto-locked" },
     [access.LOCK_JAMMED] = { "lockJammed", "Lock jammed" },
   }
+
   local detail = activity_map[event]
-  if not detail then return end
+  if not detail then
+    return
+  end
 
   if event == access.KEYPAD_LOCK_OPERATION or event == access.KEYPAD_UNLOCK_OPERATION then
     local parameter = cmd.args.event_parameter
     local code_id = tonumber(cmd.args.v1_alarm_level)
+
+    -- Zero without an event parameter is normally unattributed. Schlage
+    -- reports Lock & Leave as KEYPAD_LOCK_OPERATION with slot 0, however.
     local explicit_code_id = code_id ~= nil and code_id ~= 0
+
     if parameter and #parameter > 0 then
       local bytes = { parameter:byte(1, -1) }
       code_id = #bytes == 1 and bytes[1] or bytes[3]
+      explicit_code_id = true
+    elseif event == access.KEYPAD_LOCK_OPERATION and code_id == 0 then
       explicit_code_id = true
     end
 
@@ -286,13 +298,17 @@ function M.activity_from_notification(device, cmd, user_lookup)
     if explicit_code_id then
       user_name, user_index = user_lookup(code_id)
       user_index = user_index or code_id
+
       if not user_name or user_name == "" then
         user_name = code_id == 0 and "Master Code" or string.format("Code %d", code_id)
       end
     end
 
     local message = detail[2]
-    if user_name and user_name ~= "" then message = message .. " by " .. user_name end
+    if user_name and user_name ~= "" then
+      message = message .. " by " .. user_name
+    end
+
     M.emit_activity(device, detail[1], message, user_name, user_index)
   else
     M.emit_activity(device, detail[1], detail[2])
