@@ -68,7 +68,7 @@
       }
     },
     {
-      "label": "Alarm",
+      "label": "Activity mode sensitivity",
       "displayType": "slider",
       "slider": {
         "range": [1, 5],
@@ -80,7 +80,7 @@
       }
     },
     {
-      "label": "Alarm",
+      "label": "Tamper mode sensitivity",
       "displayType": "slider",
       "slider": {
         "range": [1, 5],
@@ -92,7 +92,7 @@
       }
     },
     {
-      "label": "Alarm",
+      "label": "Forced entry mode sensitivity",
       "displayType": "slider",
       "slider": {
         "range": [1, 5],
