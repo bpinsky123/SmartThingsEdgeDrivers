@@ -20,10 +20,11 @@ local consts              = require "lock_utils.constants"
 local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
-local default_lock = require "st.zwave.defaults.lock.lock"
-local default_unlock = require "st.zwave.defaults.lock.unlock"
+local LockDefaults = require "st.zwave.defaults.lock"
+local default_lock = LockDefaults.capability_handlers[capabilities.lock.commands.lock]
+local default_unlock = LockDefaults.capability_handlers[capabilities.lock.commands.unlock]
 local default_door_lock_operation_report =
-  require "st.zwave.defaults.lock.door_lock_operation_report"
+  LockDefaults.zwave_handlers[cc.DOOR_LOCK][DoorLock.OPERATION_REPORT]
 
 local BP_MIGRATION_TEST_ID = "heartsample19211.bpMigrationTest"
 local BP_LOCK_ACTIVITY_ID = "heartsample19211.lockActivity"
