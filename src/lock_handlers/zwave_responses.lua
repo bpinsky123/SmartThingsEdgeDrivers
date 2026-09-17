@@ -191,6 +191,7 @@ function ZwaveHandlers.door_operation_event_handler(driver, device, cmd)
       cmd.args.event_parameter,
       cmd.args.v1_alarm_level
     ))
+    local credential_name
 
     -- Retain PH/SLGA-compatible code metadata on the standard lock event.
     if code_id ~= nil and device:supports_capability(capabilities.lockCodes) then
@@ -211,11 +212,17 @@ function ZwaveHandlers.door_operation_event_handler(driver, device, cmd)
 
     capability_event.visibility = { displayed = false }
 
-    -- Retain the new user metadata for migrated locks and Routines.
+    -- Add migrated user metadata. A credential name overrides the legacy
+    -- slot name, while the user name remains the person’s name.
     if device:supports_capability(capabilities.lockUsers) then
       local credential = tables.find_entry(device, "credentials", code_id)
 
       if credential then
+        if type(credential.credentialName) == "string"
+            and credential.credentialName ~= "" then
+          credential_name = credential.credentialName
+        end
+
         local user = tables.find_entry(device, "users", credential.userIndex)
         capability_event.data.userIndex = credential.userIndex
 
@@ -226,6 +233,10 @@ function ZwaveHandlers.door_operation_event_handler(driver, device, cmd)
       else
         capability_event.data.userIndex = code_id
       end
+    end
+
+    if credential_name then
+      capability_event.data.codeName = credential_name
     end
   end
 
