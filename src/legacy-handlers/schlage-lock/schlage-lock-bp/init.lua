@@ -9,6 +9,7 @@ local Association = (require "st.zwave.CommandClass.Association")({ version = 1 
 local Battery = (require "st.zwave.CommandClass.Battery")({ version = 1 })
 local Notification = (require "st.zwave.CommandClass.Notification")({ version = 3 })
 local UserCode = (require "st.zwave.CommandClass.UserCode")({ version = 1 })
+local DoorLock = (require "st.zwave.CommandClass.DoorLock")({ version = 1 })
 local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
 local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
 local stock_capability_handlers = require "lock_handlers.capabilities"
@@ -43,6 +44,12 @@ local BP_CODE_SCAN_MAX = "bp_legacy_code_scan_max"
 local BP_CODE_SCAN_EMPTY_COUNT = "bp_legacy_code_scan_empty_count"
 local BP_MAX_CONSECUTIVE_EMPTY_SLOTS = 6
 local BP_MAX_CODE_SCAN_SLOTS = 30
+
+-- App and Routine commands normally produce only Door Lock reports, not
+-- access-control notifications. Track the requested state until confirmed.
+local PENDING_REMOTE_ACTIVITY = "bp_pending_remote_activity"
+local PENDING_REMOTE_ACTIVITY_TOKEN = "bp_pending_remote_activity_token"
+local REMOTE_ACTIVITY_TIMEOUT_SECONDS = 20
 
 local function bp_finish_code_scan(device)
   device:emit_event(capabilities.lockCodes.scanCodes(
@@ -173,6 +180,9 @@ end
 
 local can_handle = require "legacy-handlers.schlage-lock.schlage-lock-bp.can_handle"
 
+local remote_lock_command
+local remote_unlock_command
+
 local function capability_handlers()
   local handlers = {}
 
@@ -192,6 +202,11 @@ local function capability_handlers()
     end
   end
 
+  handlers[capabilities.lock.ID] = {
+    [capabilities.lock.commands.lock.NAME] = remote_lock_command,
+    [capabilities.lock.commands.unlock.NAME] = remote_unlock_command,
+  }
+
   return handlers
 end
 
@@ -203,6 +218,42 @@ local function call_parent_handler(handlers, driver, device, event, args)
   for _, handler in ipairs(handlers or {}) do
     handler(driver, device, event, args)
   end
+end
+
+local function queue_remote_activity(device, expected_mode, activity, message)
+  local token = (device:get_field(PENDING_REMOTE_ACTIVITY_TOKEN) or 0) + 1
+
+  device:set_field(PENDING_REMOTE_ACTIVITY_TOKEN, token)
+  device:set_field(PENDING_REMOTE_ACTIVITY, {
+    token = token,
+    expected_mode = expected_mode,
+    activity = activity,
+    message = message,
+  })
+
+  device.thread:call_with_delay(REMOTE_ACTIVITY_TIMEOUT_SECONDS, function()
+    local pending = device:get_field(PENDING_REMOTE_ACTIVITY)
+    if pending and pending.token == token then
+      device:set_field(PENDING_REMOTE_ACTIVITY, nil)
+    end
+  end)
+end
+
+local function call_parent_lock_handler(driver, device, command, command_name)
+  local parent_handlers = driver.capability_handlers[capabilities.lock.ID]
+    and driver.capability_handlers[capabilities.lock.ID][command_name]
+
+  call_parent_handler(parent_handlers, driver, device, command)
+end
+
+remote_lock_command = function(driver, device, command)
+  queue_remote_activity(device, "DOOR_SECURED", "remoteLocked", "Locked remotely")
+  call_parent_lock_handler(driver, device, command, capabilities.lock.commands.lock.NAME)
+end
+
+remote_unlock_command = function(driver, device, command)
+  queue_remote_activity(device, "DOOR_UNSECURED", "remoteUnlocked", "Unlocked remotely")
+  call_parent_lock_handler(driver, device, command, capabilities.lock.commands.unlock.NAME)
 end
 
 local function supports_legacy_code_initialization(device)
@@ -512,6 +563,21 @@ local function notification_report(driver, device, cmd)
   end)
 end
 
+local function door_lock_operation_report(driver, device, cmd)
+  local parent_handlers = driver.zwave_handlers[cc.DOOR_LOCK]
+    and driver.zwave_handlers[cc.DOOR_LOCK][DoorLock.OPERATION_REPORT]
+
+  call_parent_handler(parent_handlers, driver, device, cmd)
+
+  local pending = device:get_field(PENDING_REMOTE_ACTIVITY)
+  if pending and cmd.args.door_lock_mode == pending.expected_mode then
+    device:set_field(PENDING_REMOTE_ACTIVITY, nil)
+
+    -- Clear stale keypad-user metadata for app/Routine activity.
+    features.emit_activity(device, pending.activity, pending.message, "", 0)
+  end
+end
+
 local function battery_report(driver, device, cmd)
   local parent_handlers = driver.zwave_handlers[cc.BATTERY]
     and driver.zwave_handlers[cc.BATTERY][Battery.REPORT]
@@ -733,6 +799,9 @@ return {
   end)(),
 
   zwave_handlers = {
+    [cc.DOOR_LOCK] = {
+      [DoorLock.OPERATION_REPORT] = door_lock_operation_report,
+    },
     [cc.BATTERY] = {
       [Battery.REPORT] = battery_report,
     },
