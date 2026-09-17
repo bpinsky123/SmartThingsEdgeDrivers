@@ -43,7 +43,7 @@ components:
 preferences:
 - title: "Query lock codes on refresh"
   name: refreshCodes
-  description: "Retrieve user access information from the lock when refreshed. This may take a while."
+  description: "Refresh lock codes and credentials during a pull-down refresh. This may take longer on locks with many code slots."
   required: true
   preferenceType: boolean
   definition:
