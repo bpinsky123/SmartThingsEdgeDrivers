@@ -189,7 +189,9 @@ end
 
 
 local function queue_remote_activity(device, expected_mode, activity, message)
-  if not device:supports_capability_by_id(BP_LOCK_ACTIVITY_ID, "main") then
+  local activity_capability = capabilities[BP_LOCK_ACTIVITY_ID]
+  if activity_capability == nil or not device:supports_capability(activity_capability) then
+    device.log.info("BP remote activity ignored: activity capability is not supported")
     return
   end
 
@@ -201,11 +203,15 @@ local function queue_remote_activity(device, expected_mode, activity, message)
     activity = activity,
     message = message,
   })
+  device.log.info(string.format(
+    "BP remote activity queued: expected=%s activity=%s", expected_mode, activity
+  ))
 
   device.thread:call_with_delay(REMOTE_ACTIVITY_TIMEOUT_SECONDS, function()
     local pending = device:get_field(PENDING_REMOTE_ACTIVITY)
     if pending and pending.token == token then
       device:set_field(PENDING_REMOTE_ACTIVITY, nil)
+      device.log.info("BP remote activity expired without a matching Door Lock report")
     end
   end)
 end
@@ -226,6 +232,10 @@ local function bp_door_lock_operation_report(driver, device, cmd)
   local pending = device:get_field(PENDING_REMOTE_ACTIVITY)
   if pending and cmd.args.door_lock_mode == pending.expected_mode then
     device:set_field(PENDING_REMOTE_ACTIVITY, nil)
+    device.log.info(string.format(
+      "BP remote activity confirmed: mode=%s activity=%s",
+      tostring(cmd.args.door_lock_mode), pending.activity
+    ))
 
     local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
     features.emit_activity(device, pending.activity, pending.message, "", 0)
