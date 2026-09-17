@@ -58,6 +58,8 @@ local function copy_legacy_codes_to_migrated_tables(device)
   table.sort(slots, function(a, b) return a.slot < b.slot end)
 
   for _, item in ipairs(slots) do
+    local credential_name = string.format("%s PIN", item.name)
+
     local user = table_utils.find_entry(device, "users", item.slot)
     if user then
       table_utils.update_entry(device, "users", item.slot, {
@@ -74,14 +76,14 @@ local function copy_legacy_codes_to_migrated_tables(device)
     local credential = table_utils.find_entry(device, "credentials", item.slot)
     if credential then
       table_utils.update_entry(device, "credentials", item.slot, {
-        credentialName = item.name,
+        credentialName = credential_name,
         credentialType = "pin",
         userIndex = item.slot,
       })
     else
       table_utils.add_entry(device, "credentials", {
         credentialIndex = item.slot,
-        credentialName = item.name,
+        credentialName = credential_name,
         credentialType = "pin",
         userIndex = item.slot,
       })
