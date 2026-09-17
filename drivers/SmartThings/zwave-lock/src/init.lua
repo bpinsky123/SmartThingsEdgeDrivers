@@ -11,6 +11,8 @@ local cc = require "st.zwave.CommandClass"
 local UserCode = (require "st.zwave.CommandClass.UserCode")({ version = 1 })
 --- @type st.zwave.CommandClass.Notification
 local Notification = (require "st.zwave.CommandClass.Notification")({version=3})
+--- @type st.zwave.CommandClass.DoorLock
+local DoorLock = (require "st.zwave.CommandClass.DoorLock")({ version = 1 })
 
 local capabilities = require "st.capabilities"
 
@@ -18,8 +20,16 @@ local consts              = require "lock_utils.constants"
 local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
 local capability_handlers = require "lock_handlers.capabilities"
+local default_lock = require "st.zwave.defaults.lock.lock"
+local default_unlock = require "st.zwave.defaults.lock.unlock"
+local default_door_lock_operation_report =
+  require "st.zwave.defaults.lock.door_lock_operation_report"
 
 local BP_MIGRATION_TEST_ID = "heartsample19211.bpMigrationTest"
+local BP_LOCK_ACTIVITY_ID = "heartsample19211.lockActivity"
+local PENDING_REMOTE_ACTIVITY = "bp_pending_remote_activity"
+local PENDING_REMOTE_ACTIVITY_TOKEN = "bp_pending_remote_activity_token"
+local REMOTE_ACTIVITY_TIMEOUT_SECONDS = 20
 local json = require "dkjson"
 
 local LockLifecycle = {}
@@ -176,6 +186,51 @@ local function test_revert(driver, device, command)
   set_bp_migration_state(driver, device, false)
 end
 
+
+local function queue_remote_activity(device, expected_mode, activity, message)
+  if not device:supports_capability_by_id(BP_LOCK_ACTIVITY_ID, "main") then
+    return
+  end
+
+  local token = (device:get_field(PENDING_REMOTE_ACTIVITY_TOKEN) or 0) + 1
+  device:set_field(PENDING_REMOTE_ACTIVITY_TOKEN, token)
+  device:set_field(PENDING_REMOTE_ACTIVITY, {
+    token = token,
+    expected_mode = expected_mode,
+    activity = activity,
+    message = message,
+  })
+
+  device.thread:call_with_delay(REMOTE_ACTIVITY_TIMEOUT_SECONDS, function()
+    local pending = device:get_field(PENDING_REMOTE_ACTIVITY)
+    if pending and pending.token == token then
+      device:set_field(PENDING_REMOTE_ACTIVITY, nil)
+    end
+  end)
+end
+
+local function bp_lock(driver, device, command)
+  queue_remote_activity(device, "DOOR_SECURED", "remoteLocked", "Locked remotely")
+  default_lock(driver, device, command)
+end
+
+local function bp_unlock(driver, device, command)
+  queue_remote_activity(device, "DOOR_UNSECURED", "remoteUnlocked", "Unlocked remotely")
+  default_unlock(driver, device, command)
+end
+
+local function bp_door_lock_operation_report(driver, device, cmd)
+  default_door_lock_operation_report(driver, device, cmd)
+
+  local pending = device:get_field(PENDING_REMOTE_ACTIVITY)
+  if pending and cmd.args.door_lock_mode == pending.expected_mode then
+    device:set_field(PENDING_REMOTE_ACTIVITY, nil)
+
+    local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
+    features.emit_activity(device, pending.activity, pending.message, "", 0)
+  end
+end
+
 local driver_template = {
   lifecycle_handlers = {
     added = LockLifecycle.device_added,
@@ -187,6 +242,9 @@ local driver_template = {
       [0x01] = zwave_handlers.time_get_handler, -- used by DanaLock
       [0x03] = zwave_handlers.date_get_handler
     },
+    [cc.DOOR_LOCK] = {
+      [DoorLock.OPERATION_REPORT] = bp_door_lock_operation_report,
+    },
     [cc.NOTIFICATION] = {
       [Notification.REPORT] = zwave_handlers.notification_report
     },
@@ -197,8 +255,8 @@ local driver_template = {
   },
   capability_handlers = {
     [capabilities.lock.ID] = {
-      [capabilities.lock.commands.lock.NAME] = capability_handlers.lock,
-      [capabilities.lock.commands.unlock.NAME] = capability_handlers.unlock,
+      [capabilities.lock.commands.lock.NAME] = bp_lock,
+      [capabilities.lock.commands.unlock.NAME] = bp_unlock,
     },
     [capabilities.lockUsers.ID] = {
       [capabilities.lockUsers.commands.addUser.NAME] = capability_handlers.add_user,
