@@ -1,0 +1,21 @@
+{
+  "name": "Driver Status",
+  "attributes": {
+    "status": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "title": "Driver Status",
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": ["value"]
+      },
+      "enumCommands": []
+    }
+  },
+  "commands": {}
+}
