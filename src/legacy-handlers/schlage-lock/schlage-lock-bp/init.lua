@@ -56,6 +56,7 @@ local function bp_finish_code_scan(device)
   device:set_field(BP_CODE_SCAN_MAX, nil)
   device:set_field(BP_CODE_SCAN_EMPTY_COUNT, nil)
   device:set_field(constants.CHECKING_CODE, nil)
+  features.emit_driver_status(device, "Ready")
 end
 
 local function bp_request_code_slot(device, slot)
@@ -64,6 +65,8 @@ local function bp_request_code_slot(device, slot)
 end
 
 local function bp_start_code_scan(device, reported_max_codes)
+  features.emit_driver_status(device, "Retrieving lock codes")
+
   local max_codes = tonumber(reported_max_codes)
 
   if max_codes == nil then
@@ -223,6 +226,7 @@ local function start_legacy_code_scan(device)
     if device:get_field(CODE_INIT_PENDING) then
       device:set_field(CODE_INIT_PENDING, nil)
       log.warn("BP legacy code initialization timed out; no automatic retry")
+      features.emit_driver_status(device, "Code refresh incomplete")
     end
   end)
 end
@@ -354,6 +358,7 @@ local function refresh_settings_after_code_scan(driver, device, attempt)
     device:set_field(CODE_NAME_SNAPSHOT, nil)
     device:set_field(SETTINGS_AFTER_CODE_SCAN, nil)
     log.warn("BP code scan did not complete; skipping deferred settings refresh")
+    features.emit_driver_status(device, "Code refresh incomplete")
     return
   end
 
@@ -451,6 +456,8 @@ local function configuration_report(driver, device, cmd)
 end
 
 local function init(_, device)
+  features.emit_driver_status(device, "Loading driver")
+
   local fingerprint = matching_fingerprint(device)
 
   if fingerprint and device.profile.name ~= fingerprint.profile then
