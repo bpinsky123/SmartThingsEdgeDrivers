@@ -40,6 +40,8 @@ components:
     version: 1
   - id: heartsample19211.deviceNetworkId
     version: 1
+  - id: heartsample19211.driverStatus
+    version: 1
 preferences:
 - title: "Query lock codes on refresh"
   name: refreshCodes
