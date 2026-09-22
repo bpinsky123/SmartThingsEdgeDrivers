@@ -14,6 +14,8 @@ local lock_utils = require "lock_utils.utils"
 local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
 
 local SCHLAGE_LOCK_CODE_LENGTH_PARAM = { number = 16, size = 1 }
+local CODE_SCAN_STATUS_POLL_SECONDS = 1
+local CODE_SCAN_STATUS_POLL_MAX_ATTEMPTS = 90
 
 local function call_parent_handler(handlers, driver, device, event, args)
   if type(handlers) == "function" then
@@ -74,6 +76,24 @@ local function notification_report(driver, device, cmd)
   end)
 end
 
+local function watch_code_scan_status(device, attempt)
+  attempt = attempt or 0
+
+  if device:get_field(constants.DRIVER_STATE.COMMAND_IN_PROGRESS) ~= constants.SYNC.CODES_FROM_LOCK then
+    features.emit_driver_status(device, "Ready")
+    return
+  end
+
+  if attempt >= CODE_SCAN_STATUS_POLL_MAX_ATTEMPTS then
+    features.emit_driver_status(device, "Code refresh incomplete")
+    return
+  end
+
+  device.thread:call_with_delay(CODE_SCAN_STATUS_POLL_SECONDS, function()
+    watch_code_scan_status(device, attempt + 1)
+  end)
+end
+
 local function refresh_handler(driver, device, command)
   if command.component ~= nil and command.component ~= "main" then return end
 
@@ -82,12 +102,15 @@ local function refresh_handler(driver, device, command)
   stock_capability_handlers.refresh(driver, device, command)
   features.refresh_settings(device, function(refreshed_device)
     if refreshed_device.preferences.refreshCodes then
+      features.emit_driver_status(refreshed_device, "Retrieving lock codes")
       lock_utils.sync_device_state(refreshed_device)
+      watch_code_scan_status(refreshed_device)
     end
   end)
 end
 
 local function init(_, device)
+  features.emit_driver_status(device, "Loading driver")
   features.emit_device_network_id(device)
   features.refresh_settings(device)
 end
