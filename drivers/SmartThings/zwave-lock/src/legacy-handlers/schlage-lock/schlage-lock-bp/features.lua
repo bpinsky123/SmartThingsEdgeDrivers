@@ -18,6 +18,7 @@ M.capabilities = {
   interior_button = capabilities["heartsample19211.interiorSchlageButton"],
   activity = capabilities["heartsample19211.lockActivity"],
   device_network_id = capabilities["heartsample19211.deviceNetworkId"],
+  driver_status = capabilities["heartsample19211.driverStatus"],
 }
 
 local params = {
@@ -59,6 +60,7 @@ end
 local function finish_settings_refresh(device)
   device:set_field(SETTINGS_REFRESH_QUEUE, nil)
   device:set_field(SETTINGS_REFRESH_IN_FLIGHT, nil)
+  M.emit_driver_status(device, "Ready")
   run_settings_refresh_callbacks(device)
 end
 
@@ -108,6 +110,16 @@ function M.emit_device_network_id(device)
   end
 end
 
+function M.emit_driver_status(device, status)
+  local component = setting_component(device)
+  local cap = M.capabilities.driver_status
+  if component and device:supports_capability_by_id(cap.ID, component.id) then
+    device:emit_component_event(component, cap.status(status, {
+      visibility = { displayed = false },
+    }))
+  end
+end
+
 local function emit_setting(device, parameter, value, force_state_change)
   local setting = params[parameter]
   local component = setting and setting_component(device)
@@ -147,6 +159,8 @@ end
 
 function M.refresh_settings(device, on_complete)
   if device:get_field(SETTINGS_REFRESH_QUEUE) ~= nil then return false end
+
+  M.emit_driver_status(device, "Retrieving Schlage settings")
 
   if on_complete then
     local callbacks = SETTINGS_REFRESH_CALLBACKS[device.id] or {}
