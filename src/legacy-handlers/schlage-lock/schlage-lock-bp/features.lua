@@ -115,6 +115,7 @@ function M.emit_driver_status(device, status)
   local cap = M.capabilities.driver_status
   if component and device:supports_capability_by_id(cap.ID, component.id) then
     device:emit_component_event(component, cap.status(status, {
+      state_change = true,
       visibility = { displayed = false },
     }))
   end
