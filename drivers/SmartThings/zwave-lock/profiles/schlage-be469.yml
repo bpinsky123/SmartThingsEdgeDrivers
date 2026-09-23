@@ -24,7 +24,7 @@ components:
   categories:
   - name: SmartLock
 - id: settings
-  label: Settings
+  label: Lock settings
   capabilities:
   - id: heartsample19211.schlageLockAlarm
     version: 1

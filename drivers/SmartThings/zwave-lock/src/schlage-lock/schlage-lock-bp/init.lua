@@ -110,7 +110,6 @@ local function refresh_handler(driver, device, command)
 end
 
 local function init(_, device)
-  features.emit_driver_status(device, "Loading driver")
   features.emit_device_network_id(device)
   features.refresh_settings(device)
 end
