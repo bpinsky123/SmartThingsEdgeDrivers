@@ -56,7 +56,12 @@ local function bp_finish_code_scan(device)
   device:set_field(BP_CODE_SCAN_MAX, nil)
   device:set_field(BP_CODE_SCAN_EMPTY_COUNT, nil)
   device:set_field(constants.CHECKING_CODE, nil)
-  features.emit_driver_status(device, "Ready")
+
+  -- A pull-down code refresh immediately starts the paced settings queue.
+  -- Keep its in-progress status instead of briefly reporting Ready.
+  if not device:get_field(SETTINGS_AFTER_CODE_SCAN) then
+    features.emit_driver_status(device, "Ready")
+  end
 end
 
 local function bp_request_code_slot(device, slot)
@@ -456,7 +461,6 @@ local function configuration_report(driver, device, cmd)
 end
 
 local function init(_, device)
-  features.emit_driver_status(device, "Loading driver")
 
   local fingerprint = matching_fingerprint(device)
 
