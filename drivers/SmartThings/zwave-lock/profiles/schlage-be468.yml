@@ -7,6 +7,8 @@ components:
     version: 1
   - id: lockCodes
     version: 1
+  - id: heartsample19211.bpMigrationTest
+    version: 1
   - id: lockCredentials
     version: 1
   - id: lockUsers
@@ -18,8 +20,6 @@ components:
   - id: battery
     version: 1
   - id: refresh
-    version: 1
-  - id: heartsample19211.bpMigrationTest
     version: 1
   categories:
   - name: SmartLock
