@@ -32,7 +32,6 @@ local SETTINGS_AFTER_BATTERY = "bp_settings_after_battery"
 local CODE_INIT_TIMEOUT_SECONDS = 20
 local CODE_SCAN_POLL_SECONDS = 1
 local CODE_SCAN_POLL_MAX_ATTEMPTS = 90
-local CODE_NAME_SNAPSHOT = "bp_legacy_code_name_snapshot"
 
 -- BP owns scan sequencing so it can safely exceed the framework's
 -- eight-slot legacy lockCodes limit without modifying shared constants.
@@ -41,8 +40,23 @@ local BP_CODE_SCAN_WAITING = "bp_legacy_code_scan_waiting"
 local BP_CODE_SCAN_INDEX = "bp_legacy_code_scan_index"
 local BP_CODE_SCAN_MAX = "bp_legacy_code_scan_max"
 local BP_CODE_SCAN_EMPTY_COUNT = "bp_legacy_code_scan_empty_count"
+local BP_CODE_SCAN_REQUEST_TOKEN = "bp_legacy_code_scan_request_token"
+local BP_CODE_SCAN_RETRY_COUNT = "bp_legacy_code_scan_retry_count"
 local BP_MAX_CONSECUTIVE_EMPTY_SLOTS = 6
 local BP_MAX_CODE_SCAN_SLOTS = 30
+local BP_CODE_SCAN_RESPONSE_TIMEOUT_SECONDS = 10
+local BP_CODE_SCAN_MAX_RETRIES = 1
+
+local function bp_clear_code_scan(device)
+  device:set_field(BP_CODE_SCAN_ACTIVE, nil)
+  device:set_field(BP_CODE_SCAN_WAITING, nil)
+  device:set_field(BP_CODE_SCAN_INDEX, nil)
+  device:set_field(BP_CODE_SCAN_MAX, nil)
+  device:set_field(BP_CODE_SCAN_EMPTY_COUNT, nil)
+  device:set_field(BP_CODE_SCAN_REQUEST_TOKEN, nil)
+  device:set_field(BP_CODE_SCAN_RETRY_COUNT, nil)
+  device:set_field(constants.CHECKING_CODE, nil)
+end
 
 local function bp_finish_code_scan(device)
   device:emit_event(capabilities.lockCodes.scanCodes(
@@ -50,12 +64,7 @@ local function bp_finish_code_scan(device)
     { visibility = { displayed = false } }
   ))
 
-  device:set_field(BP_CODE_SCAN_ACTIVE, nil)
-  device:set_field(BP_CODE_SCAN_WAITING, nil)
-  device:set_field(BP_CODE_SCAN_INDEX, nil)
-  device:set_field(BP_CODE_SCAN_MAX, nil)
-  device:set_field(BP_CODE_SCAN_EMPTY_COUNT, nil)
-  device:set_field(constants.CHECKING_CODE, nil)
+  bp_clear_code_scan(device)
 
   -- A pull-down code refresh immediately starts the paced settings queue.
   -- Keep its in-progress status instead of briefly reporting Ready.
@@ -64,12 +73,83 @@ local function bp_finish_code_scan(device)
   end
 end
 
-local function bp_request_code_slot(device, slot)
+local function bp_abort_code_scan(device, slot)
+  log.warn("BP code scan stopped after slot " .. tostring(slot) .. " did not respond")
+  device:emit_event(capabilities.lockCodes.scanCodes(
+    "Complete",
+    { visibility = { displayed = false } }
+  ))
+
+  bp_clear_code_scan(device)
+
+  if not device:get_field(SETTINGS_AFTER_CODE_SCAN) then
+    features.emit_driver_status(device, "Code refresh incomplete")
+  end
+end
+
+local function bp_request_code_slot(device, slot, retry_count)
+  local token = (device:get_field(BP_CODE_SCAN_REQUEST_TOKEN) or 0) + 1
+  retry_count = retry_count or 0
+
   device:set_field(BP_CODE_SCAN_INDEX, slot)
+  device:set_field(BP_CODE_SCAN_REQUEST_TOKEN, token)
+  device:set_field(BP_CODE_SCAN_RETRY_COUNT, retry_count)
   device:send(UserCode:Get({ user_identifier = slot }))
+
+  device.thread:call_with_delay(BP_CODE_SCAN_RESPONSE_TIMEOUT_SECONDS, function()
+    if not device:get_field(BP_CODE_SCAN_ACTIVE)
+        or device:get_field(BP_CODE_SCAN_INDEX) ~= slot
+        or device:get_field(BP_CODE_SCAN_REQUEST_TOKEN) ~= token then
+      return
+    end
+
+    local retries = device:get_field(BP_CODE_SCAN_RETRY_COUNT) or 0
+    if retries < BP_CODE_SCAN_MAX_RETRIES then
+      log.warn("BP code scan retrying slot " .. tostring(slot) .. " after no report")
+      bp_request_code_slot(device, slot, retries + 1)
+    else
+      bp_abort_code_scan(device, slot)
+    end
+  end)
+end
+
+-- The default lockCodes handler stores its local name map in LOCK_CODES. That
+-- state can be empty after a driver switch even though the cloud-backed
+-- lockCodes attribute still has the user's established names. Restore that
+-- local map before scanning so existing occupied slots retain their names.
+local function hydrate_legacy_code_cache(device)
+  local encoded = device:get_latest_state(
+    "main",
+    capabilities.lockCodes.ID,
+    capabilities.lockCodes.lockCodes.NAME
+  )
+
+  if type(encoded) ~= "string" or encoded == "" then
+    return false
+  end
+
+  local ok, decoded = pcall(json.decode, encoded)
+  if not ok or type(decoded) ~= "table" then
+    log.warn("BP could not hydrate legacy code cache: invalid lockCodes state")
+    return false
+  end
+
+  local lock_codes = {}
+  for slot, name in pairs(decoded) do
+    local code_slot = tonumber(slot)
+    if code_slot ~= nil and code_slot >= 0
+        and code_slot == math.floor(code_slot)
+        and type(name) == "string" and name ~= "" then
+      lock_codes[tostring(code_slot)] = name
+    end
+  end
+
+  device:set_field(constants.LOCK_CODES, lock_codes, { persist = true })
+  return true
 end
 
 local function bp_start_code_scan(device, reported_max_codes)
+  hydrate_legacy_code_cache(device)
   features.emit_driver_status(device, "Retrieving lock codes")
 
   local max_codes = tonumber(reported_max_codes)
@@ -93,6 +173,8 @@ local function bp_start_code_scan(device, reported_max_codes)
   device:set_field(BP_CODE_SCAN_ACTIVE, true)
   device:set_field(BP_CODE_SCAN_MAX, max_codes)
   device:set_field(BP_CODE_SCAN_EMPTY_COUNT, 0)
+  device:set_field(BP_CODE_SCAN_REQUEST_TOKEN, 0)
+  device:set_field(BP_CODE_SCAN_RETRY_COUNT, 0)
 
   device:emit_event(capabilities.lockCodes.scanCodes(
     "Scanning",
@@ -262,80 +344,6 @@ local function begin_legacy_code_initialization(_, device)
   start_legacy_code_scan(device)
 end
 
-local function snapshot_code_names(device)
-  local encoded = device:get_latest_state(
-    "main",
-    capabilities.lockCodes.ID,
-    capabilities.lockCodes.lockCodes.NAME
-  )
-
-  if type(encoded) ~= "string" or encoded == "" then
-    return
-  end
-
-  local ok, decoded = pcall(json.decode, encoded)
-  if not ok or type(decoded) ~= "table" then
-    return
-  end
-
-  local snapshot = {}
-  for slot, name in pairs(decoded) do
-    if type(name) == "string" and name ~= "" then
-      snapshot[tostring(slot)] = name
-    end
-  end
-
-  if next(snapshot) ~= nil then
-    device:set_field(CODE_NAME_SNAPSHOT, snapshot)
-  end
-end
-
-local function restore_code_names(driver, device)
-  local snapshot = device:get_field(CODE_NAME_SNAPSHOT)
-  device:set_field(CODE_NAME_SNAPSHOT, nil)
-
-  if type(snapshot) ~= "table" then
-    return
-  end
-
-  local encoded = device:get_latest_state(
-    "main",
-    capabilities.lockCodes.ID,
-    capabilities.lockCodes.lockCodes.NAME
-  )
-  local ok, current = pcall(json.decode, encoded or "")
-
-  if not ok or type(current) ~= "table" then
-    return
-  end
-
-  local names_to_restore = {}
-
-  for slot, saved_name in pairs(snapshot) do
-    local current_name = current[slot] or current[tonumber(slot)]
-
-    -- Restore only slots that still exist after the scan.
-    if current_name ~= nil and current_name ~= saved_name then
-      table.insert(names_to_restore, {
-        slot = tonumber(slot),
-        name = saved_name,
-      })
-    end
-  end
-
-  table.sort(names_to_restore, function(a, b)
-    return a.slot < b.slot
-  end)
-
-  for _, entry in ipairs(names_to_restore) do
-    driver:inject_capability_command(device, {
-      capability = capabilities.lockCodes.ID,
-      command = capabilities.lockCodes.commands.nameSlot.NAME,
-      args = { entry.slot, entry.name },
-    })
-  end
-end
-
 local function refresh_settings_after_code_scan(driver, device, attempt)
   attempt = attempt or 0
 
@@ -350,7 +358,6 @@ local function refresh_settings_after_code_scan(driver, device, attempt)
   )
 
   if scan_state == "Complete" then
-    restore_code_names(driver, device)
     device:set_field(CODE_SCAN_ACTIVE, nil)
     device:set_field(SETTINGS_AFTER_CODE_SCAN, nil)
     log.info("BP code scan complete; starting paced Schlage settings refresh")
@@ -360,7 +367,6 @@ local function refresh_settings_after_code_scan(driver, device, attempt)
 
   if attempt >= CODE_SCAN_POLL_MAX_ATTEMPTS then
     device:set_field(CODE_SCAN_ACTIVE, nil)
-    device:set_field(CODE_NAME_SNAPSHOT, nil)
     device:set_field(SETTINGS_AFTER_CODE_SCAN, nil)
     log.warn("BP code scan did not complete; skipping deferred settings refresh")
     features.emit_driver_status(device, "Code refresh incomplete")
@@ -401,6 +407,10 @@ local function refresh_handler(driver, device, command)
   local run_code_scan = false
 
   if is_main_refresh then
+    -- Keep the local legacy map in sync even when this refresh is not
+    -- configured to query every physical code slot.
+    hydrate_legacy_code_cache(device)
+
     -- During first initialization, bootstrap owns BP settings followed by
     -- code initialization. Do not start a second scan from stock refresh.
     if not device:get_field(BOOTSTRAP_REQUIRED) then
@@ -415,8 +425,12 @@ local function refresh_handler(driver, device, command)
       end
     end
 
-    -- Stock refresh still immediately requests lock, battery, and users count.
+    -- Stock refresh requests lock and battery. BP explicitly requests the user count when a code scan was selected.
     stock_capability_handlers.refresh(driver, device, command)
+
+    if run_code_scan then
+      device:send(UserCode:UsersNumberGet({}))
+    end
   end
 
   -- A legacy code scan owns the radio. Its completion starts settings refresh.
@@ -573,7 +587,6 @@ local function users_number_report(driver, device, cmd)
   -- Bootstrap already ran settings first and must not leave this guard set.
   if refreshing then
     device:set_field(CODE_SCAN_ACTIVE, true)
-    snapshot_code_names(device)
   end
 
   bp_start_code_scan(device, cmd.args.supported_users)

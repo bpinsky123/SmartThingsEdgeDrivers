@@ -1,0 +1,44 @@
+{
+  "dashboard": {
+    "states": [],
+    "actions": [],
+    "panelItems": []
+  },
+  "detailView": [
+    {
+      "label": "BP Migration Test",
+      "displayType": "switch",
+      "switch": {
+        "command": {
+          "on": "migrate",
+          "off": "revert"
+        },
+        "state": {
+          "value": "mode.value",
+          "valueType": "string",
+          "on": "migrated",
+          "off": "legacy",
+          "label": "{{mode.value}}",
+          "alternatives": [
+            {
+              "key": "legacy",
+              "value": "Legacy",
+              "type": "inactive"
+            },
+            {
+              "key": "migrated",
+              "value": "Migrated",
+              "type": "active"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "automation": {
+    "conditions": [],
+    "actions": []
+  },
+  "id": "heartsample19211.bpMigrationTest",
+  "version": 1
+}
