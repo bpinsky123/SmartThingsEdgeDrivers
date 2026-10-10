@@ -16,6 +16,58 @@ local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
 local SCHLAGE_LOCK_CODE_LENGTH_PARAM = { number = 16, size = 1 }
 local CODE_SCAN_STATUS_POLL_SECONDS = 1
 local CODE_SCAN_STATUS_POLL_MAX_ATTEMPTS = 90
+local PROFILE_READY_RETRY_COUNT = "bp_migrated_profile_ready_retry_count"
+local PROFILE_READY_RETRY_SCHEDULED = "bp_migrated_profile_ready_retry_scheduled"
+local SETTINGS_STARTED = "bp_migrated_settings_started"
+local PROFILE_READY_RETRY_SECONDS = 1
+local PROFILE_READY_MAX_RETRIES = 12
+
+local FINGERPRINTS = {
+  { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469" },
+  { mfr = 0x003B, prod = 0x6341, model = 0x5044, profile = "bp-schlage-be469" },
+  { mfr = 0x003B, prod = 0x0001, model = 0x0468, profile = "bp-schlage-be468" },
+  { mfr = 0x003B, prod = 0x6349, model = 0x5044, profile = "bp-schlage-be468" },
+}
+
+local function matching_fingerprint(device)
+  for _, fingerprint in ipairs(FINGERPRINTS) do
+    if device:id_match(fingerprint.mfr, fingerprint.prod, fingerprint.model) then
+      return fingerprint
+    end
+  end
+end
+
+local function start_settings_when_profile_ready(device)
+  if device:get_field(SETTINGS_STARTED) then
+    return true
+  end
+
+  -- The profile update is asynchronous. The shared settings queue returns
+  -- true only after its BP capability set is actually available.
+  features.emit_device_network_id(device)
+  if features.refresh_settings(device) then
+    device:set_field(PROFILE_READY_RETRY_COUNT, nil)
+    device:set_field(PROFILE_READY_RETRY_SCHEDULED, nil)
+    device:set_field(SETTINGS_STARTED, true)
+    return true
+  end
+
+  local retries = device:get_field(PROFILE_READY_RETRY_COUNT) or 0
+  if retries >= PROFILE_READY_MAX_RETRIES then
+    return false
+  end
+
+  if not device:get_field(PROFILE_READY_RETRY_SCHEDULED) then
+    device:set_field(PROFILE_READY_RETRY_SCHEDULED, true)
+    device:set_field(PROFILE_READY_RETRY_COUNT, retries + 1)
+    device.thread:call_with_delay(PROFILE_READY_RETRY_SECONDS, function()
+      device:set_field(PROFILE_READY_RETRY_SCHEDULED, nil)
+      start_settings_when_profile_ready(device)
+    end)
+  end
+
+  return false
+end
 
 local function call_parent_handler(handlers, driver, device, event, args)
   if type(handlers) == "function" then
@@ -110,8 +162,21 @@ local function refresh_handler(driver, device, command)
 end
 
 local function init(_, device)
-  features.emit_device_network_id(device)
-  features.refresh_settings(device)
+  device:set_field(SETTINGS_STARTED, nil)
+  device:set_field(PROFILE_READY_RETRY_COUNT, nil)
+  device:set_field(PROFILE_READY_RETRY_SCHEDULED, nil)
+
+  local fingerprint = matching_fingerprint(device)
+  if fingerprint and device.profile.name ~= fingerprint.profile then
+    device:try_update_metadata({ profile = fingerprint.profile })
+  end
+
+  start_settings_when_profile_ready(device)
+end
+
+local function info_changed(driver, device, event, args)
+  call_parent_handler(driver.lifecycle_handlers.infoChanged, driver, device, event, args)
+  start_settings_when_profile_ready(device)
 end
 
 local function do_configure(driver, device)
@@ -122,7 +187,7 @@ local function do_configure(driver, device)
     grouping_identifier = 2,
     node_ids = { driver.environment_info.hub_zwave_id },
   }))
-  features.refresh_settings(device)
+  start_settings_when_profile_ready(device)
 end
 
 return {
@@ -145,6 +210,7 @@ return {
   },
   lifecycle_handlers = {
     init = init,
+    infoChanged = info_changed,
     doConfigure = do_configure,
   },
 }

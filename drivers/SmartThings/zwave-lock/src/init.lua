@@ -19,6 +19,7 @@ local capabilities = require "st.capabilities"
 local consts              = require "lock_utils.constants"
 local table_utils         = require "lock_utils.tables"
 local zwave_handlers      = require "lock_handlers.zwave_responses"
+local bp_package_variant  = require "bp_package_variant"
 local capability_handlers = require "lock_handlers.capabilities"
 local LockDefaults = require "st.zwave.defaults.lock"
 local default_lock = LockDefaults.capability_handlers[capabilities.lock.commands.lock]
@@ -147,10 +148,13 @@ function LockLifecycle.device_added(driver, device)
 end
 
 function LockLifecycle.init(driver, device)
- emit_bp_migration_state(
-    device,
-    device:get_field(consts.DRIVER_STATE.SLGA_MIGRATED) == true
-  )
+  if not bp_package_variant.migrated_only then
+    emit_bp_migration_state(
+      device,
+      device:get_field(consts.DRIVER_STATE.SLGA_MIGRATED) == true
+    )
+  end
+
   -- Restore users/credentials capability state from the persistent store in case
   -- the capability state cache was wiped since the last driver run.
   table_utils.restore_from_persistent_store(device)
@@ -279,10 +283,10 @@ local driver_template = {
     [capabilities.refresh.ID] = {
       [capabilities.refresh.commands.refresh.NAME] = refresh,
     },
-    [BP_MIGRATION_TEST_ID] = {
+    [BP_MIGRATION_TEST_ID] = not bp_package_variant.migrated_only and {
       migrate = test_migrate,
       revert = test_revert,
-    },
+    } or nil,
   },
   supported_capabilities = {
     capabilities.lock,

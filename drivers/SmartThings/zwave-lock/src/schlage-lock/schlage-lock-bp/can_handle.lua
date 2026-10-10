@@ -1,3 +1,4 @@
+local capabilities = require "st.capabilities"
 local constants = require "lock_utils.constants"
 
 local FINGERPRINTS = {
@@ -8,7 +9,14 @@ local FINGERPRINTS = {
 }
 
 return function(_, _, device)
-  if device:get_field(constants.DRIVER_STATE.SLGA_MIGRATED) ~= true then
+  local migrated = device:get_field(constants.DRIVER_STATE.SLGA_MIGRATED) == true
+    or device:get_latest_state(
+      "main",
+      capabilities.lockCodes.ID,
+      capabilities.lockCodes.migrated.NAME
+    ) == true
+
+  if not migrated then
     return false
   end
 

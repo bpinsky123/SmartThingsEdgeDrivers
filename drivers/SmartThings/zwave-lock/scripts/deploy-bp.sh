@@ -4,9 +4,9 @@ set -euo pipefail
 
 variant=${1:-}
 case "$variant" in
-  migration-test|beta) ;;
+  migration-test|beta|migrated) ;;
   *)
-    echo "Usage: $0 {migration-test|beta} [output-zip]" >&2
+    echo "Usage: $0 {migration-test|beta|migrated} [output-zip]" >&2
     exit 2
     ;;
 esac
