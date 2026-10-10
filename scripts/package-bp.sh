@@ -4,9 +4,9 @@ set -euo pipefail
 
 variant=${1:-}
 case "$variant" in
-  migration-test|beta) ;;
+  migration-test|beta|migrated) ;;
   *)
-    echo "Usage: $0 {migration-test|beta} [output-zip]" >&2
+    echo "Usage: $0 {migration-test|beta|migrated} [output-zip]" >&2
     exit 2
     ;;
 esac
@@ -24,10 +24,17 @@ cp -a "$driver_dir/." "$stage_dir"
 rm -rf "$stage_dir/scripts"
 find "$stage_dir" -type f -name '*.zip' -delete
 
-if [ "$variant" = beta ]; then
+if [ "$variant" = beta ] || [ "$variant" = migrated ]; then
+  driver_name="Z-Wave Lock BP Beta"
+  package_key="zwave-lock-bp-beta"
+  if [ "$variant" = migrated ]; then
+    driver_name="Z-Wave Lock BP Migrated"
+    package_key="zwave-lock-bp-migrated"
+  fi
+
   sed -i \
-    -e "s/^name: .*/name: 'Z-Wave Lock BP Beta'/" \
-    -e "s/^packageKey: .*/packageKey: 'zwave-lock-bp-beta'/" \
+    -e "s/^name: .*/name: '$driver_name'/" \
+    -e "s/^packageKey: .*/packageKey: '$package_key'/" \
     "$stage_dir/config.yml"
 
   for profile in \
@@ -40,6 +47,10 @@ if [ "$variant" = beta ]; then
     ' "$profile" > "$profile.tmp"
     mv "$profile.tmp" "$profile"
   done
+fi
+
+if [ "$variant" = migrated ]; then
+  cp -a "$driver_dir/packaging/migrated/." "$stage_dir/"
 fi
 
 (
