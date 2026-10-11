@@ -3,4 +3,4 @@ packageKey: 'zwave-lock-bp'
 permissions:
   zwave: {}
 description: 'Enhanced functionality for Schlage BE468/BE469 Z-Wave locks'
-vendorSupportInformation: 'Developer: h0ckeysk8er <br><br><a href="https://community.smartthings.com/t/st-edge-z-wave-lock-bp-beta-schlage-be468-be469/311019">SmartThings Community discussion</a><br><br><a href="https://github.com/bpinsky123/SmartThingsEdgeDrivers/tree/schlage-lock-clean/drivers/SmartThings/zwave-lock">GitHub repo</a>'
+vendorSupportInformation: 'Developer: h0ckeysk8er <br><br><a href="https://community.smartthings.com/t/st-edge-z-wave-lock-bp-beta-schlage-be468-be469/311019">SmartThings Community discussion</a><br><br><a href="https://github.com/bpinsky123/SmartThingsEdgeDrivers/tree/zwave-lock-bp-release">GitHub repo</a>'
