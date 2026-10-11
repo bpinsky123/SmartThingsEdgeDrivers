@@ -4,7 +4,7 @@ Z-Wave Lock BP Beta is a community SmartThings Edge driver for legacy Schlage BE
 
 It builds on the original Schlage-specific feature work by [@philh30](https://community.smartthings.com/u/philh30) in the [Z-Wave Lock PH driver](https://community.smartthings.com/t/st-edge-z-wave-lock-ph/255998), while incorporating the current SmartThings Z-Wave Lock driver and adding clearer lock activity, named keypad activity, and more reliable initialization and refresh handling.
 
-This is a beta release. It has been tested with Schlage BE468/BE469 hardware, but feedback from owners of other Schlage Z-Wave variants is welcome.
+This beta currently supports only the Schlage BE468 and BE469 Z-Wave fingerprints included in the driver. Feedback from owners of either supported model is welcome.
 
 ## Features
 
