@@ -12,6 +12,7 @@ This is a beta release. It has been tested with Schlage BE468/BE469 hardware, bu
 - Schlage configuration controls: Auto-lock, keypad beep, Lock & Leave, vacation mode, interior Schlage button, and alarm mode/sensitivity settings
 - Lock activity reporting for manual, keypad, remote, and auto-lock operations, plus lock jams
 - Named keypad activity when SmartThings has a name for the code slot, such as `Unlocked with keypad by Test 1`
+- Preserves existing code-slot names across driver reloads and switches to BP
 - Device Network ID shown in Settings for troubleshooting
 - Optional code/credential refresh during a pull-down refresh
 - A recovery query for affected newer Schlage firmware that may fail to report an Auto-lock setting change
