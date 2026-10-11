@@ -16,23 +16,11 @@ This is a beta release. It has been tested with Schlage BE468/BE469 hardware, bu
 - Optional code/credential refresh during a pull-down refresh
 - A recovery query for affected newer Schlage firmware that may fail to report an Auto-lock setting change
 
-## Before switching drivers: save code-slot names
+## Switching drivers
 
-Lock PINs cannot be read from the lock, and lock-code names are maintained by the current SmartThings driver rather than stored on the lock itself.
+The current BP driver hydrates its lock-code cache from the existing SmartThings `lockCodes` state when it loads or refreshes. Existing code-slot names are therefore preserved when switching to BP; you do not need to record and restore them first.
 
-Before switching from another driver, save the current `lockCodes` value. This gives you a record of existing slot names in case the new driver initially displays generic names such as `Code 1`.
-
-Using the SmartThings CLI:
-
-```bash
-smartthings devices:status <DEVICE_ID> --json
-```
-
-Find and save `main → lockCodes → lockCodes`.
-
-You can also save the names from the [SmartThings Advanced Web App](https://my.smartthings.com/): open the device, select **Status**, then find `main → lockCodes → lockCodes` and copy its JSON value.
-
-Keep this as a private reference. It contains code-slot names only, not PINs. After switching drivers, rename slots if necessary using Smart Lock Guest Access (SLGA), or the `lockCodes` `nameSlot` command in the SmartThings Advanced Web App or SmartThings CLI.
+Lock PIN values themselves cannot be read from the lock.
 
 ## Installation
 
@@ -53,7 +41,7 @@ A pull-down refresh reads lock state, battery, and Schlage feature settings. If 
 
 - This driver reports the state and notifications sent by the lock. A `Lock jammed` event can indicate a mechanical/calibration issue, weak batteries, mounting or strike-plate alignment, or lock hardware trouble; it does not necessarily indicate a driver problem. The driver reports the lock state as `Unknown` after a jam notification, which may disable Lock/Unlock controls in the SmartThings mobile app until the lock reports a known state.
 - The lock cannot disclose existing PIN values. A code refresh can determine slot occupancy, but names are maintained locally by SmartThings.
-- Switching among unrelated drivers may cause locally maintained code-slot names to fall back to generic names such as `Code 1`.
+- Other drivers may not preserve locally maintained code-slot names when switching away from BP.
 - This channel also contains **Z-Wave Lock BP Migration Test**, intended only for advanced testing of SmartThings’ evolving lock-code migration behavior. Normal users should install **Z-Wave Lock BP Beta**. DM [@h0ckeysk8er](https://community.smartthings.com/u/h0ckeysk8er) if interested in testing the migration version.
 
 ## Capturing logs for an issue
@@ -84,4 +72,4 @@ Please include:
 - The action that failed
 - A focused SmartThings CLI log capture using the instructions above
 
-Source and issue tracking: [SmartThingsEdgeDrivers — Z-Wave Lock](https://github.com/bpinsky123/SmartThingsEdgeDrivers/tree/schlage-lock-clean/drivers/SmartThings/zwave-lock).
+Source and issue tracking: [SmartThingsEdgeDrivers — Z-Wave Lock](https://github.com/bpinsky123/SmartThingsEdgeDrivers/tree/zwave-lock-bp-release).
