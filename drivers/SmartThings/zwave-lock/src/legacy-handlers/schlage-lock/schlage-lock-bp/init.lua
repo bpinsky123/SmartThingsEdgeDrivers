@@ -42,6 +42,7 @@ local BP_CODE_SCAN_MAX = "bp_legacy_code_scan_max"
 local BP_CODE_SCAN_EMPTY_COUNT = "bp_legacy_code_scan_empty_count"
 local BP_CODE_SCAN_REQUEST_TOKEN = "bp_legacy_code_scan_request_token"
 local BP_CODE_SCAN_RETRY_COUNT = "bp_legacy_code_scan_retry_count"
+local BP_CODE_NAMES_HYDRATED = "bp_legacy_code_names_hydrated"
 local BP_MAX_CONSECUTIVE_EMPTY_SLOTS = 6
 local BP_MAX_CODE_SCAN_SLOTS = 30
 local BP_CODE_SCAN_RESPONSE_TIMEOUT_SECONDS = 10
@@ -118,6 +119,10 @@ end
 -- lockCodes attribute still has the user's established names. Restore that
 -- local map before scanning so existing occupied slots retain their names.
 local function hydrate_legacy_code_cache(device)
+  if device:get_field(BP_CODE_NAMES_HYDRATED) then
+    return true
+  end
+
   local encoded = device:get_latest_state(
     "main",
     capabilities.lockCodes.ID,
@@ -144,7 +149,12 @@ local function hydrate_legacy_code_cache(device)
     end
   end
 
+  if next(lock_codes) == nil then
+    return false
+  end
+
   device:set_field(constants.LOCK_CODES, lock_codes, { persist = true })
+  device:set_field(BP_CODE_NAMES_HYDRATED, true)
   return true
 end
 
@@ -599,6 +609,7 @@ local function users_number_report(driver, device, cmd)
 end
 
 local function bp_added_handler(driver, device, event, args)
+  hydrate_legacy_code_cache(device)
   init(driver, device)
   device:set_field(BOOTSTRAP_REQUIRED, true)
   device:set_field(BP_PROFILE_READY, nil)
@@ -609,6 +620,7 @@ local function bp_added_handler(driver, device, event, args)
 end
 
 local function driver_switched(driver, device)
+  hydrate_legacy_code_cache(device)
   init(driver, device)
   device:set_field(BOOTSTRAP_REQUIRED, true)
   device:set_field(BP_PROFILE_READY, nil)
