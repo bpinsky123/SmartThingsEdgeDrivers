@@ -12,14 +12,22 @@ This beta currently supports only the Schlage BE468 and BE469 Z-Wave fingerprint
 - Schlage configuration controls: Auto-lock, keypad beep, Lock & Leave, vacation mode, interior Schlage button, and alarm mode/sensitivity settings
 - Lock activity reporting for manual, keypad, remote, and auto-lock operations, plus lock jams
 - Named keypad activity when SmartThings has a name for the code slot, such as `Unlocked with keypad by Test 1`
-- Preserves existing code-slot names across driver reloads and switches to BP
+- Preserves code-slot names across BP reloads; can also preserve names from another standard `lockCodes` driver on hubs using firmware 0.59 or later
 - Device Network ID shown in Settings for troubleshooting
 - Optional code/credential refresh during a pull-down refresh
 - A recovery query for affected newer Schlage firmware that may fail to report an Auto-lock setting change
 
-## Switching drivers
+## Switching drivers and code-slot names
 
-The current BP driver hydrates its lock-code cache from the existing SmartThings `lockCodes` state when it loads or refreshes. Existing code-slot names are therefore preserved when switching to BP; you do not need to record and restore them first.
+BP preserves code-slot names across its own reloads. On hubs using firmware 0.59 or later, it can also hydrate names from the standard SmartThings `lockCodes` state when switching directly from a compatible driver, such as Z-Wave Lock PH.
+
+Older hub firmware does not expose the prior driver's `lockCodes` state to the new driver during a switch. On those hubs, export the names before switching and restore them after BP completes its initial scan:
+
+    ./scripts/preserve-lock-code-names.sh export DEVICE_ID lock-code-names.json
+
+    ./scripts/preserve-lock-code-names.sh restore DEVICE_ID lock-code-names.json
+
+The helper saves and restores slot names only; it never reads, stores, or sends PIN values. Add `--dry-run` to the restore command to review the slots that would be renamed.
 
 Lock PIN values themselves cannot be read from the lock.
 
