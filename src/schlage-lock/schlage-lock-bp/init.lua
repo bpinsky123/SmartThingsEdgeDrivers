@@ -180,12 +180,12 @@ local function info_changed(driver, device, event, args)
 end
 
 local function do_configure(driver, device)
+  device:send(Association:Set({
+    grouping_identifier = 1,
+    node_ids = { driver.environment_info.hub_zwave_id },
+  }))
   device:send(Configuration:Get({
     parameter_number = SCHLAGE_LOCK_CODE_LENGTH_PARAM.number,
-  }))
-  device:send(Association:Set({
-    grouping_identifier = 2,
-    node_ids = { driver.environment_info.hub_zwave_id },
   }))
   start_settings_when_profile_ready(device)
 end
