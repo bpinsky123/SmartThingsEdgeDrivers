@@ -6,6 +6,7 @@ local constants = require "st.zwave.constants"
 local cc = require "st.zwave.CommandClass"
 local Configuration = (require "st.zwave.CommandClass.Configuration")({ version = 2 })
 local Association = (require "st.zwave.CommandClass.Association")({ version = 1 })
+local Basic = (require "st.zwave.CommandClass.Basic")({ version = 1 })
 local Battery = (require "st.zwave.CommandClass.Battery")({ version = 1 })
 local Notification = (require "st.zwave.CommandClass.Notification")({ version = 3 })
 local UserCode = (require "st.zwave.CommandClass.UserCode")({ version = 1 })
@@ -43,6 +44,7 @@ local BP_CODE_SCAN_EMPTY_COUNT = "bp_legacy_code_scan_empty_count"
 local BP_CODE_SCAN_REQUEST_TOKEN = "bp_legacy_code_scan_request_token"
 local BP_CODE_SCAN_RETRY_COUNT = "bp_legacy_code_scan_retry_count"
 local BP_CODE_NAMES_HYDRATED = "bp_legacy_code_names_hydrated"
+local BP_CODE_NAMES = "bp_legacy_code_names"
 local BP_MAX_CONSECUTIVE_EMPTY_SLOTS = 6
 local BP_MAX_CODE_SCAN_SLOTS = 30
 local BP_CODE_SCAN_RESPONSE_TIMEOUT_SECONDS = 10
@@ -119,7 +121,9 @@ end
 -- lockCodes attribute still has the user's established names. Restore that
 -- local map before scanning so existing occupied slots retain their names.
 local function hydrate_legacy_code_cache(device)
-  if device:get_field(BP_CODE_NAMES_HYDRATED) then
+  local existing_lock_codes = device:get_field(constants.LOCK_CODES)
+  if device:get_field(BP_CODE_NAMES_HYDRATED)
+      and type(existing_lock_codes) == "table" then
     return true
   end
 
@@ -156,6 +160,45 @@ local function hydrate_legacy_code_cache(device)
   device:set_field(constants.LOCK_CODES, lock_codes, { persist = true })
   device:set_field(BP_CODE_NAMES_HYDRATED, true)
   return true
+end
+
+-- BP overrides the lockCodes command table for its scanner, so keep a local
+-- equivalent of the stock rename-only handler rather than relying on a parent
+-- dispatcher entry.  This changes only the cloud/local slot label; it never
+-- writes a PIN to the lock.
+local function bp_name_slot(_, device, cmd)
+  local code_slot = tonumber(cmd.args.codeSlot)
+  local code_name = cmd.args.codeName
+
+  if code_slot == nil or code_slot < 0 or code_slot ~= math.floor(code_slot)
+      or type(code_name) ~= "string" then
+    return
+  end
+
+  hydrate_legacy_code_cache(device)
+  local lock_codes = device:get_field(constants.LOCK_CODES)
+  if type(lock_codes) ~= "table" then
+    lock_codes = device:get_field(BP_CODE_NAMES)
+  end
+  local slot = tostring(code_slot)
+  if type(lock_codes) ~= "table" then
+    -- Older hub firmware cannot rehydrate cloud state after a driver swap.
+    -- A deliberate nameSlot command is still safe to honor: it changes only
+    -- metadata and lets a restore rebuild the persistent local map.
+    lock_codes = {}
+  end
+
+  lock_codes[slot] = code_name
+  device:set_field(constants.LOCK_CODES, lock_codes, { persist = true })
+  device:set_field(BP_CODE_NAMES, lock_codes, { persist = true })
+  device:emit_event(capabilities.lockCodes.lockCodes(
+    json.encode(lock_codes),
+    { visibility = { displayed = false } }
+  ))
+  device:emit_event(capabilities.lockCodes.codeChanged(
+    slot .. " renamed",
+    { state_change = true }
+  ))
 end
 
 local function bp_start_code_scan(device, reported_max_codes)
@@ -214,12 +257,23 @@ local function bp_user_code_report(driver, device, cmd)
     stock_handler(driver, device, cmd)
   end
 
+  local reported_slot = tonumber(cmd.args.user_identifier)
+  if reported_slot ~= nil then
+    local code_names = device:get_field(BP_CODE_NAMES) or {}
+    local slot = tostring(reported_slot)
+    if bp_slot_is_occupied(cmd) then
+      code_names[slot] = LockCodesDefaults.get_code_name(device, slot)
+    else
+      code_names[slot] = nil
+    end
+    device:set_field(BP_CODE_NAMES, code_names, { persist = true })
+  end
+
   if not device:get_field(BP_CODE_SCAN_ACTIVE) then
     return
   end
 
   local expected_slot = device:get_field(BP_CODE_SCAN_INDEX)
-  local reported_slot = tonumber(cmd.args.user_identifier)
   if reported_slot == nil or reported_slot ~= expected_slot then
     return
   end
@@ -737,12 +791,21 @@ local function info_changed(driver, device, event, args)
   end
 end
 
+-- All supported Schlage BP locks expose only Group 1 Lifeline. Do not
+-- alter that association in response to BASIC_SET.
+local function basic_set_handler(_, device, cmd)
+  device:emit_event(cmd.args.value == 0
+    and capabilities.lock.lock.unlocked()
+    or capabilities.lock.lock.locked())
+end
+
 local function do_configure(driver, device)
-  device:send(Configuration:Get({ parameter_number = 16 }))
   device:send(Association:Set({
-    grouping_identifier = 2,
+    grouping_identifier = 1,
     node_ids = { driver.environment_info.hub_zwave_id },
   }))
+  device:send(Configuration:Get({ parameter_number = 16 }))
+
 
   -- Bootstrap owns initial settings refresh. Never overlap a code scan.
   if not device:get_field(BOOTSTRAP_REQUIRED)
@@ -764,6 +827,7 @@ return {
 
     handlers[capabilities.lockCodes.ID] = {
       [capabilities.lockCodes.commands.reloadAllCodes.NAME] = bp_reload_all_codes,
+      [capabilities.lockCodes.commands.nameSlot.NAME] = bp_name_slot,
     }
 
     return handlers
@@ -772,6 +836,9 @@ return {
   zwave_handlers = {
     [cc.BATTERY] = {
       [Battery.REPORT] = battery_report,
+    },
+    [cc.BASIC] = {
+      [Basic.SET] = basic_set_handler,
     },
     [cc.CONFIGURATION] = {
       [Configuration.REPORT] = configuration_report,

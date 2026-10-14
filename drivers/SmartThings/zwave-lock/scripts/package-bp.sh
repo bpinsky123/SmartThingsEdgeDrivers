@@ -22,7 +22,7 @@ trap cleanup EXIT
 
 cp -a "$driver_dir/." "$stage_dir"
 rm -rf "$stage_dir/scripts"
-find "$stage_dir" -type f -name '*.zip' -delete
+find "$stage_dir" -type f \( -name '*.zip' -o -name '*.rewrite' \) -delete
 
 if [ "$variant" = beta ] || [ "$variant" = migrated ]; then
   driver_name="Z-Wave Lock BP Beta"
