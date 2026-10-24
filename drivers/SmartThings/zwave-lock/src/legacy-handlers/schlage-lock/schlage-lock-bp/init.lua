@@ -14,6 +14,7 @@ local LockCodesDefaults = require "st.zwave.defaults.lockCodes"
 local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
 local stock_capability_handlers = require "lock_handlers.capabilities"
 local json = require "dkjson"
+local lock_constants = require "lock_utils.constants"
 local log = require "log"
 
 -- Bootstrap uses two signals: infoChanged means that the BP profile is active;
@@ -22,6 +23,7 @@ local BOOTSTRAP_REQUIRED = "bp_bootstrap_required"
 local BP_PROFILE_READY = "bp_profile_ready"
 local STOCK_BATTERY_RECEIVED = "bp_stock_battery_received"
 local BOOTSTRAP_STARTED = "bp_bootstrap_started"
+local BP_MIGRATION_TEST_ID = "heartsample19211.bpMigrationTest"
 
 local CODE_INIT_PENDING = "bp_legacy_code_init_pending"
 local CODE_LENGTH_PENDING = "bp_legacy_code_length_pending"
@@ -780,9 +782,38 @@ local function apply_code_length_preference(device)
   }))
 end
 
+-- Synchronize the Migration Test control after its BP profile becomes active.
+-- The cloud lockCodes.migrated attribute remains authoritative and is never
+-- changed by this synchronization.
+local function synchronize_migration_test_state(device)
+  if not device:supports_capability_by_id(BP_MIGRATION_TEST_ID, "main") then
+    return
+  end
+
+  local migrated = device:get_latest_state(
+    "main",
+    capabilities.lockCodes.ID,
+    capabilities.lockCodes.migrated.NAME
+  ) == true
+
+  device:set_field(
+    lock_constants.DRIVER_STATE.SLGA_MIGRATED,
+    migrated,
+    { persist = true }
+  )
+
+  device:emit_event(capabilities[BP_MIGRATION_TEST_ID].mode(
+    migrated and "migrated" or "legacy",
+    { visibility = { displayed = false } }
+  ))
+
+  log.info("BP migration test state synchronized from cloud: " .. tostring(migrated))
+end
+
 local function info_changed(driver, device, event, args)
   call_parent_handler(driver.lifecycle_handlers.infoChanged, driver, device, event, args)
   mark_profile_ready_and_try_bootstrap(driver, device)
+  synchronize_migration_test_state(device)
 
   -- Do not add Configuration traffic while bootstrap or a code scan owns it.
   if not device:get_field(BOOTSTRAP_REQUIRED)
