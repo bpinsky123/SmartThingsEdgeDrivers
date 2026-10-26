@@ -1,0 +1,51 @@
+{
+    "id": "smoothgreen26756.slgaMigrationToggle",
+    "version": 1,
+    "status": "proposed",
+    "name": "SLGA Migration Toggle",
+    "ephemeral": false,
+    "attributes": {
+        "status": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string",
+                        "enum": [
+                            "available",
+                            "enabled",
+                            "migrated",
+                            "unsupported"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "value"
+                ]
+            },
+            "enumCommands": [
+                {
+                    "command": "enable",
+                    "value": "enabled"
+                },
+                {
+                    "command": "available",
+                    "value": "available"
+                }
+            ]
+        }
+    },
+    "commands": {
+        "enable": {
+            "name": "enable",
+            "arguments": [],
+            "sensitive": false
+        },
+        "available": {
+            "name": "available",
+            "arguments": [],
+            "sensitive": false
+        }
+    }
+}

@@ -14,6 +14,7 @@ local lock_utils = require "lock_utils.utils"
 local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
 
 local SCHLAGE_LOCK_CODE_LENGTH_PARAM = { number = 16, size = 1 }
+local SLGA_MIGRATION_ID = "smoothgreen26756.slgaMigrationToggle"
 local CODE_SCAN_STATUS_POLL_SECONDS = 1
 local CODE_SCAN_STATUS_POLL_MAX_ATTEMPTS = 90
 local PROFILE_READY_RETRY_COUNT = "bp_migrated_profile_ready_retry_count"
@@ -23,10 +24,10 @@ local PROFILE_READY_RETRY_SECONDS = 1
 local PROFILE_READY_MAX_RETRIES = 12
 
 local FINGERPRINTS = {
-  { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469" },
-  { mfr = 0x003B, prod = 0x6341, model = 0x5044, profile = "bp-schlage-be469" },
-  { mfr = 0x003B, prod = 0x0001, model = 0x0468, profile = "bp-schlage-be468" },
-  { mfr = 0x003B, prod = 0x6349, model = 0x5044, profile = "bp-schlage-be468" },
+  { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469-migrated-v1" },
+  { mfr = 0x003B, prod = 0x6341, model = 0x5044, profile = "bp-schlage-be469-migrated-v1" },
+  { mfr = 0x003B, prod = 0x0001, model = 0x0468, profile = "bp-schlage-be468-migrated-v1" },
+  { mfr = 0x003B, prod = 0x6349, model = 0x5044, profile = "bp-schlage-be468-migrated-v1" },
 }
 
 local function matching_fingerprint(device)
@@ -162,6 +163,11 @@ local function refresh_handler(driver, device, command)
 end
 
 local function init(_, device)
+  if device:supports_capability_by_id(SLGA_MIGRATION_ID, "main") then
+    device:emit_event(capabilities[SLGA_MIGRATION_ID].status(
+      "migrated", { visibility = { displayed = false } }
+    ))
+  end
   device:set_field(SETTINGS_STARTED, nil)
   device:set_field(PROFILE_READY_RETRY_COUNT, nil)
   device:set_field(PROFILE_READY_RETRY_SCHEDULED, nil)

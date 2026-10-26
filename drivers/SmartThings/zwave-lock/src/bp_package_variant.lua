@@ -3,4 +3,5 @@
 
 return {
   migrated_only = false,
+  migration_test = false,
 }

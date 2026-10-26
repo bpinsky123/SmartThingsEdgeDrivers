@@ -15,11 +15,17 @@ local features = require "legacy-handlers.schlage-lock.schlage-lock-bp.features"
 local stock_capability_handlers = require "lock_handlers.capabilities"
 local json = require "dkjson"
 local lock_constants = require "lock_utils.constants"
+local bp_package_variant = require "bp_package_variant"
+local synchronize_migration_state
+local SLGA_MIGRATION_ID = "smoothgreen26756.slgaMigrationToggle"
+local update_slga_migration_status
+
 local log = require "log"
 
 -- Bootstrap uses two signals: infoChanged means that the BP profile is active;
 -- Battery REPORT means the stock main-card refresh has completed.
 local BOOTSTRAP_REQUIRED = "bp_bootstrap_required"
+local BP_PROFILE_UPDATE_PENDING = "bp_profile_update_pending"
 local BP_PROFILE_READY = "bp_profile_ready"
 local STOCK_BATTERY_RECEIVED = "bp_stock_battery_received"
 local BOOTSTRAP_STARTED = "bp_bootstrap_started"
@@ -313,10 +319,10 @@ local PROFILE_READY_RETRY_SECONDS = 1
 local PROFILE_READY_MAX_RETRIES = 12
 
 local FINGERPRINTS = {
-  { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469" },
-  { mfr = 0x003B, prod = 0x6341, model = 0x5044, profile = "bp-schlage-be469" },
-  { mfr = 0x003B, prod = 0x0001, model = 0x0468, profile = "bp-schlage-be468" },
-  { mfr = 0x003B, prod = 0x6349, model = 0x5044, profile = "bp-schlage-be468" },
+  { mfr = 0x003B, prod = 0x0001, model = 0x0469, profile = "bp-schlage-be469-slga-v4" },
+  { mfr = 0x003B, prod = 0x6341, model = 0x5044, profile = "bp-schlage-be469-slga-v4" },
+  { mfr = 0x003B, prod = 0x0001, model = 0x0468, profile = "bp-schlage-be468-slga-v4" },
+  { mfr = 0x003B, prod = 0x6349, model = 0x5044, profile = "bp-schlage-be468-slga-v4" },
 }
 
 local function matching_fingerprint(device)
@@ -541,12 +547,19 @@ local function configuration_report(driver, device, cmd)
 end
 
 local function init(_, device)
-
   local fingerprint = matching_fingerprint(device)
 
   if fingerprint and device.profile.name ~= fingerprint.profile then
-    device:try_update_metadata({ profile = fingerprint.profile })
+    if device:get_field(BP_PROFILE_UPDATE_PENDING) ~= fingerprint.profile then
+      device:set_field(BP_PROFILE_UPDATE_PENDING, fingerprint.profile)
+      log.info("Updating device profile to " .. fingerprint.profile)
+      device:try_update_metadata({ profile = fingerprint.profile })
+    end
+    return
   end
+
+  device:set_field(BP_PROFILE_UPDATE_PENDING, nil)
+  synchronize_migration_state(device)
 end
 
 local function legacy_user_lookup(device, code_id)
@@ -782,38 +795,162 @@ local function apply_code_length_preference(device)
   }))
 end
 
--- Synchronize the Migration Test control after its BP profile becomes active.
--- The cloud lockCodes.migrated attribute remains authoritative and is never
--- changed by this synchronization.
-local function synchronize_migration_test_state(device)
-  if not device:supports_capability_by_id(BP_MIGRATION_TEST_ID, "main") then
+-- hubcore 59+ provides lazy_device_state_config in the startup augmented store.
+-- Its presence means get_latest_state can retrieve cloud-backed device state.
+local function supports_cloud_backed_device_state(device)
+  return (device.driver.hub_augmented_driver_data or {}).lazy_device_state_config ~= nil
+end
+
+local function emit_slga_migration_status(device, status)
+  if not device:supports_capability_by_id(SLGA_MIGRATION_ID, "main") then
     return
   end
 
-  local migrated = device:get_latest_state(
+  device:emit_event(capabilities[SLGA_MIGRATION_ID].status(
+    status,
+    { visibility = { displayed = false } }
+  ))
+end
+
+update_slga_migration_status = function(device)
+  if not device:supports_capability_by_id(SLGA_MIGRATION_ID, "main") then
+    return
+  end
+
+  local status
+  if not supports_cloud_backed_device_state(device) then
+    status = "unsupported"
+  else
+    local cloud_state = device:get_latest_state(
+      "main",
+      capabilities.lockCodes.ID,
+      capabilities.lockCodes.migrated.NAME
+    )
+    if cloud_state == true then
+      status = "migrated"
+    elseif cloud_state == false then
+      status = "enabled"
+    else
+      status = "available"
+    end
+  end
+
+  emit_slga_migration_status(device, status)
+end
+
+-- Synchronizes migrated state for every BP package. Migration Test variants may
+-- initialize an absent cloud value to false, and only on hubcore 59+.
+synchronize_migration_state = function(device)
+  local has_test_control = device:supports_capability_by_id(
+    BP_MIGRATION_TEST_ID, "main"
+  )
+
+  local cloud_state
+  if supports_cloud_backed_device_state(device) then
+    cloud_state = device:get_latest_state(
+      "main",
+      capabilities.lockCodes.ID,
+      capabilities.lockCodes.migrated.NAME
+    )
+  end
+
+  local persisted_state = device:get_field(
+    lock_constants.DRIVER_STATE.SLGA_MIGRATED
+  ) == true
+
+  if cloud_state == nil
+      and bp_package_variant.migration_test
+      and supports_cloud_backed_device_state(device) then
+    cloud_state = false
+    device:emit_event(capabilities.lockCodes.migrated(
+      false,
+      { visibility = { displayed = false } }
+    ))
+    log.info(
+      "BP migration test: initialized missing cloud migration state to false " ..
+      "(lazy device state supported)"
+    )
+  end
+
+  -- Never clear a known local migrated marker merely because an older hub
+  -- cannot retrieve cloud-backed state after a driver switch.
+  local migrated = cloud_state == true
+    or (cloud_state == nil and persisted_state)
+
+  if cloud_state ~= nil or migrated then
+    device:set_field(
+      lock_constants.DRIVER_STATE.SLGA_MIGRATED,
+      migrated,
+      { persist = true }
+    )
+  end
+
+  if migrated then
+    device:emit_event(capabilities.lockCodes.migrated(
+      true,
+      { visibility = { displayed = false } }
+    ))
+
+    if device:supports_capability(capabilities.lockCredentials, "main") then
+      device:emit_event(capabilities.lockCredentials.supportedCredentials(
+        { "pin" },
+        { visibility = { displayed = false } }
+      ))
+    end
+  end
+
+  if has_test_control then
+    device:emit_event(capabilities[BP_MIGRATION_TEST_ID].mode(
+      migrated and "migrated" or "legacy",
+      { visibility = { displayed = false } }
+    ))
+  end
+
+  update_slga_migration_status(device)
+
+  log.info(
+    "BP migration state synchronized: cloud=" .. tostring(cloud_state) ..
+    ", migrated=" .. tostring(migrated)
+  )
+end
+
+local function enable_slga_migration(_, device)
+  if not supports_cloud_backed_device_state(device) then
+    emit_slga_migration_status(device, "unsupported")
+    return
+  end
+
+  local cloud_state = device:get_latest_state(
     "main",
     capabilities.lockCodes.ID,
     capabilities.lockCodes.migrated.NAME
-  ) == true
-
-  device:set_field(
-    lock_constants.DRIVER_STATE.SLGA_MIGRATED,
-    migrated,
-    { persist = true }
   )
 
-  device:emit_event(capabilities[BP_MIGRATION_TEST_ID].mode(
-    migrated and "migrated" or "legacy",
-    { visibility = { displayed = false } }
-  ))
+  if cloud_state == true then
+    emit_slga_migration_status(device, "migrated")
+    return
+  end
 
-  log.info("BP migration test state synchronized from cloud: " .. tostring(migrated))
+  if cloud_state == nil then
+    device:emit_event(capabilities.lockCodes.migrated(
+      false,
+      { visibility = { displayed = false } }
+    ))
+    device:set_field(
+      lock_constants.DRIVER_STATE.SLGA_MIGRATED,
+      false,
+      { persist = true }
+    )
+    log.info("BP SLGA migration enabled by user")
+  end
+
+  emit_slga_migration_status(device, "enabled")
 end
 
 local function info_changed(driver, device, event, args)
   call_parent_handler(driver.lifecycle_handlers.infoChanged, driver, device, event, args)
   mark_profile_ready_and_try_bootstrap(driver, device)
-  synchronize_migration_test_state(device)
+  synchronize_migration_state(device)
 
   -- Do not add Configuration traffic while bootstrap or a code scan owns it.
   if not device:get_field(BOOTSTRAP_REQUIRED)
@@ -859,6 +996,13 @@ return {
     handlers[capabilities.lockCodes.ID] = {
       [capabilities.lockCodes.commands.reloadAllCodes.NAME] = bp_reload_all_codes,
       [capabilities.lockCodes.commands.nameSlot.NAME] = bp_name_slot,
+    }
+
+    handlers[SLGA_MIGRATION_ID] = {
+      ["enable"] = enable_slga_migration,
+      ["available"] = function(_, device)
+        update_slga_migration_status(device)
+      end,
     }
 
     return handlers

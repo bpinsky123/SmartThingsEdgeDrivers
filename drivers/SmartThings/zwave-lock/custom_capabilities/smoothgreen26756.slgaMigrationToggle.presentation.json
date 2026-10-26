@@ -1,0 +1,50 @@
+{
+    "dashboard": {
+        "states": [],
+        "actions": [],
+        "panelItems": []
+    },
+    "detailView": [
+        {
+            "label": "SLGA Migration",
+            "displayType": "switch",
+            "switch": {
+                "command": {
+                    "on": "enable",
+                    "off": "enable"
+                },
+                "state": {
+                    "value": "status.value",
+                    "valueType": "string",
+                    "on": "enabled",
+                    "off": "available",
+                    "label": "{{status.value}}",
+                    "alternatives": [
+                        {
+                            "key": "available",
+                            "value": "Available",
+                            "type": "inactive"
+                        },
+                        {
+                            "key": "enabled",
+                            "value": "Enabled",
+                            "type": "active"
+                        },
+                        {
+                            "key": "migrated",
+                            "value": "Migrated",
+                            "type": "active"
+                        },
+                        {
+                            "key": "unsupported",
+                            "value": "Not supported on this hub",
+                            "type": "inactive"
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "id": "smoothgreen26756.slgaMigrationToggle",
+    "version": 1
+}

@@ -49,6 +49,12 @@ if [ "$variant" = beta ] || [ "$variant" = migrated ]; then
   done
 fi
 
+if [ "$variant" = migration-test ]; then
+  sed -i \
+    -e 's/migration_test = false/migration_test = true/' \
+    "$stage_dir/src/bp_package_variant.lua"
+fi
+
 if [ "$variant" = migrated ]; then
   cp -a "$driver_dir/packaging/migrated/." "$stage_dir/"
 fi

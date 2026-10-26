@@ -11,6 +11,7 @@ heartsample19211.autoLock
 heartsample19211.lockAndLeave
 heartsample19211.vacationMode
 heartsample19211.keypadBeep
+smoothgreen26756.slgaMigrationToggle
 heartsample19211.interiorSchlageButton
 heartsample19211.deviceNetworkId
 "

@@ -1,4 +1,4 @@
-name: bp-schlage-be469
+name: bp-schlage-be469-slga-v4
 components:
 - id: main
   label: Main
@@ -9,6 +9,16 @@ components:
     version: 1
   - id: heartsample19211.bpMigrationTest
     version: 1
+  - id: smoothgreen26756.slgaMigrationToggle
+    version: 1
+    config:
+      visibleCondition:
+        capability: smoothgreen26756.slgaMigrationToggle
+        version: 1
+        component: main
+        value: status.value
+        operator: EQUALS
+        operand: available
   - id: lockCredentials
     version: 1
   - id: lockUsers
