@@ -39,7 +39,9 @@ if [ "$variant" = beta ] || [ "$variant" = migrated ]; then
 
   for profile in \
     "$stage_dir/profiles/schlage-be468.yml" \
-    "$stage_dir/profiles/schlage-be469.yml"; do
+    "$stage_dir/profiles/schlage-be469.yml" \
+    "$stage_dir/profiles/schlage-be468-pre59.yml" \
+    "$stage_dir/profiles/schlage-be469-pre59.yml"; do
     awk '
       $0 == "  - id: heartsample19211.bpMigrationTest" { skip = 1; next }
       skip && $0 == "    version: 1" { skip = 0; next }

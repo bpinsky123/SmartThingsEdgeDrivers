@@ -314,6 +314,12 @@ local function bp_reload_all_codes(_, device, _)
   bp_start_code_scan(device, max_codes)
 end
 
+-- hubcore 59+ provides lazy_device_state_config in the startup augmented store.
+-- Its presence means get_latest_state can retrieve cloud-backed device state.
+local function supports_cloud_backed_device_state(device)
+  return (device.driver.hub_augmented_driver_data or {}).lazy_device_state_config ~= nil
+end
+
 local PROFILE_READY_RETRY_COUNT = "bp_profile_ready_retry_count"
 local PROFILE_READY_RETRY_SECONDS = 1
 local PROFILE_READY_MAX_RETRIES = 12
@@ -328,7 +334,11 @@ local FINGERPRINTS = {
 local function matching_fingerprint(device)
   for _, fingerprint in ipairs(FINGERPRINTS) do
     if device:id_match(fingerprint.mfr, fingerprint.prod, fingerprint.model) then
-      return fingerprint
+      local profile = fingerprint.profile
+      if not supports_cloud_backed_device_state(device) then
+        profile = profile:gsub("%-slga%-v4$", "-pre59-v1")
+      end
+      return { profile = profile }
     end
   end
 end
@@ -793,12 +803,6 @@ local function apply_code_length_preference(device)
     configuration_value = desired,
     size = 1,
   }))
-end
-
--- hubcore 59+ provides lazy_device_state_config in the startup augmented store.
--- Its presence means get_latest_state can retrieve cloud-backed device state.
-local function supports_cloud_backed_device_state(device)
-  return (device.driver.hub_augmented_driver_data or {}).lazy_device_state_config ~= nil
 end
 
 local function emit_slga_migration_status(device, status)
